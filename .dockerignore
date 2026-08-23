@@ -1,0 +1,26 @@
+# Dependencies (reinstalled inside the image)
+**/node_modules
+
+# Git
+**/.git
+**/.gitignore
+
+# Secrets & local-only data
+.env
+server/.env
+naaturalis.db
+naaturalis.db-shm
+naaturalis.db-wal
+*.log
+
+# Runtime data (created empty in the image; use a volume/object storage in prod)
+uploads
+
+# Legacy pre-built admin bundle (admin/ is built from source in the image)
+static
+index.html
+
+# Docs & config
+README.md
+Dockerfile
+.dockerignore

@@ -1,0 +1,29 @@
+# Dependencies
+node_modules/
+
+# Environment / secrets
+.env
+.env.*
+!.env.example
+
+# Build output
+admin/build/
+client/dist/
+static/
+
+# SQLite / local databases
+*.db
+*.db-shm
+*.db-wal
+
+# Logs
+*.log
+*.pid
+
+# User uploads
+uploads/
+
+# OS / editor
+.DS_Store
+Thumbs.db
+*.swp

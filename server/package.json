@@ -1,0 +1,19 @@
+{
+  "name": "naaturalis-clone",
+  "version": "1.0.0",
+  "description": "Local clone of naaturalis.com (fully self-contained)",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js",
+    "migrate": "node migrate-sqlite-to-pg.js"
+  },
+  "dependencies": {
+    "bcryptjs": "^3.0.3",
+    "express": "^4.18.2",
+    "https-proxy-agent": "^9.1.0",
+    "jsonwebtoken": "^9.0.3",
+    "pg": "^8.23.0",
+    "uuid": "^14.0.1"
+  }
+}

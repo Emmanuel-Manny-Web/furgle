@@ -1,0 +1,178 @@
+const https = require("https");
+const { getProxyAgent } = require("./proxy");
+
+const BASE = "https://api.korapay.com/merchant/api/v1";
+
+function getConfig(settings) {
+  const s = settings || {};
+  return {
+    secretKey: s.kora_secret_key || process.env.KORA_SECRET_KEY || "",
+    publicKey: s.kora_public_key || process.env.KORA_PUBLIC_KEY || "",
+    encryptionKey: s.kora_encryption_key || process.env.KORA_ENCRYPTION_KEY || "",
+    proxyUrl: s.lumenhub_proxy_url || process.env.LUMENHUB_PROXY_URL || "",
+  };
+}
+
+function request(method, path, body, cfg, authKey) {
+  return new Promise((resolve, reject) => {
+    const url = new URL(BASE + path);
+    const payload = body ? JSON.stringify(body) : null;
+    const agent = getProxyAgent(cfg && cfg.proxyUrl);
+    const req = https.request(
+      {
+        hostname: url.hostname,
+        path: url.pathname + url.search,
+        method,
+        ...(agent ? { agent } : {}),
+        headers: {
+          Authorization: "Bearer " + (authKey || cfg.secretKey),
+          Accept: "application/json",
+          "Content-Type": "application/json",
+          ...(payload ? { "Content-Length": Buffer.byteLength(payload) } : {}),
+        },
+      },
+      (res) => {
+        let data = "";
+        res.on("data", (c) => (data += c));
+        res.on("end", () => {
+          let json = null;
+          try { json = JSON.parse(data); } catch { json = null; }
+          resolve({ status: res.statusCode, body: json });
+        });
+      }
+    );
+    req.on("error", reject);
+    req.setTimeout(25000, () => req.destroy(new Error("Kora request timed out")));
+    if (payload) req.write(payload);
+    req.end();
+  });
+}
+
+// Create a single-use virtual account for a bank-transfer deposit.
+async function createVirtualAccount({ reference, amount, name, email, phone }, cfg) {
+  try {
+    const fullName = (name || "Customer").trim() || "Customer";
+    const r = await request("POST", "/charges/bank-transfer", {
+      reference,
+      amount: Number(amount),
+      currency: "NGN",
+      customer: {
+        name: fullName,
+        email: email || (phone ? phone + "@lumenhub.com" : "customer@lumenhub.com"),
+      },
+    }, cfg);
+    if (!r.body || !r.body.data) return { error: (r.body && (r.body.message || r.body.error)) || "Kora virtual account creation failed" };
+    const d = r.body.data;
+    const ba = d.bank_account || {};
+    return {
+      data: {
+        account_reference: d.reference || reference,
+        account_number: ba.account_number || d.account_number || null,
+        account_name: ba.account_name || d.account_name || null,
+        bank_name: ba.bank_name || "Kora",
+        bank_code: ba.bank_code || null,
+      },
+    };
+  } catch (err) {
+    return { error: err.message };
+  }
+}
+
+// Verify a bank-transfer charge by its reference.
+async function verifyCharge(reference, cfg) {
+  try {
+    const r = await request("GET", "/charges/" + encodeURIComponent(reference), null, cfg);
+    if (!r.body || !r.body.data) return { error: (r.body && (r.body.message || r.body.error)) || "Kora charge not found" };
+    const d = r.body.data;
+    return { data: { status: d.status, amount: d.amount, reference: d.reference } };
+  } catch (err) {
+    return { error: err.message };
+  }
+}
+
+// Check whether a virtual account has received the expected amount.
+async function isVirtualAccountPaid(reference, expectedAmount, cfg) {
+  const v = await verifyCharge(reference, cfg);
+  if (v.error || !v.data) return { paid: false };
+  const s = String(v.data.status || "").toLowerCase();
+  const amt = Number(v.data.amount);
+  return { paid: ["success", "paid"].includes(s) && Number.isFinite(amt) && amt >= Number(expectedAmount) };
+}
+
+async function listBanks(cfg) {
+  try {
+    const r = await request("GET", "/misc/banks?countryCode=NG", null, cfg, cfg.publicKey);
+    if (!r.body || !r.body.data) return { error: (r.body && (r.body.message || r.body.error)) || "Failed to list banks" };
+    return { data: (r.body.data || []).map((b) => ({ code: String(b.code), name: b.name })) };
+  } catch (err) {
+    return { error: err.message };
+  }
+}
+
+// Resolve a bank account name (account name enquiry).
+async function resolveAccount(account_number, bank_code, cfg) {
+  try {
+    const r = await request("POST", "/misc/banks/resolve", {
+      bank: String(bank_code),
+      account: String(account_number),
+    }, cfg);
+    if (!r.body || !r.body.data) return { error: (r.body && (r.body.message || r.body.error)) || "Name enquiry failed" };
+    return { data: { account_name: r.body.data.account_name || r.body.data.accountName || null } };
+  } catch (err) {
+    return { error: err.message };
+  }
+}
+
+// Initiate a single bank payout (disbursement).
+async function createPayout({ amount, account_number, bank_code, account_name, reference, narration }, cfg) {
+  try {
+    const r = await request("POST", "/transactions/disburse", {
+      reference,
+      destination: {
+        type: "bank_account",
+        amount: Number(amount),
+        currency: "NGN",
+        narration: narration || "Lumenhub payout",
+        bank_account: {
+          bank: String(bank_code),
+          account: String(account_number),
+        },
+        customer: { name: account_name || "Customer", email: "payout@lumenhub.com" },
+      },
+    }, cfg);
+    if (!r.body || !r.body.data) return { error: (r.body && (r.body.message || r.body.error)) || "Kora payout failed" };
+    const d = r.body.data;
+    return { data: { reference: d.reference || reference, status: d.status || "processing" } };
+  } catch (err) {
+    return { error: err.message };
+  }
+}
+
+// Verify a payout (disbursement) by reference.
+async function verifyPayout(reference, cfg) {
+  try {
+    const r = await request("GET", "/transactions/" + encodeURIComponent(reference), null, cfg);
+    if (!r.body || !r.body.data) return { error: (r.body && (r.body.message || r.body.error)) || "Kora payout not found" };
+    const d = r.body.data;
+    return { data: { status: d.status, reference: d.reference } };
+  } catch (err) {
+    return { error: err.message };
+  }
+}
+
+async function queryBalance(cfg) {
+  try {
+    const r = await request("GET", "/balances", null, cfg);
+    if (!r.body || !r.body.data) return { error: (r.body && (r.body.message || r.body.error)) || "Balance not available" };
+    const d = r.body.data || {};
+    const ngn = d.NGN || {};
+    return { data: { balance: Number(ngn.available_balance || 0), currency: "NGN" } };
+  } catch (err) {
+    return { error: err.message };
+  }
+}
+
+module.exports = {
+  getConfig, createVirtualAccount, verifyCharge, isVirtualAccountPaid, listBanks, resolveAccount,
+  createPayout, verifyPayout, queryBalance,
+};

@@ -1,0 +1,457 @@
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&family=Manrope:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@300;400;500;600;700&display=swap');
+@import url('https://api.fontshare.com/v2/css?f[]=cabinet-grotesk@400,500,800&f[]=satoshi@400,500,700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* =========================================================
+   COLOR SYSTEM — Light (default) + Dark (.dark on <html>)
+   Modern fintech palette: Indigo + Coral/Pink + Amber
+   ========================================================= */
+@layer base {
+  :root {
+    /* Shadcn HSL tokens */
+    --background: 240 33% 98%;        /* #FAFAFC */
+    --foreground: 222 47% 11%;        /* #0F172A */
+    --card: 0 0% 100%;
+    --card-foreground: 222 47% 11%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 222 47% 11%;
+    --primary: 239 84% 60%;           /* #4F46E5 indigo-600 */
+    --primary-foreground: 0 0% 100%;
+    --secondary: 240 15% 96%;
+    --secondary-foreground: 222 47% 11%;
+    --muted: 240 14% 95%;
+    --muted-foreground: 215 16% 46%;  /* #64748b */
+    --accent: 329 86% 56%;            /* #EC4899 pink-500 */
+    --accent-foreground: 0 0% 100%;
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 220 14% 92%;
+    --input: 220 14% 92%;
+    --ring: 239 84% 60%;
+    --radius: 0.875rem;
+
+    /* App-specific tokens */
+    --app-bg: #FAFAFC;
+    --surface: #FFFFFF;
+    --surface-alt: #F4F4F8;
+    --surface-2: #ECECF5;
+    --text-primary: #0F172A;
+    --text-secondary: #475569;
+    --text-tertiary: #94A3B8;
+
+    --brand: #4F46E5;
+    --brand-hover: #4338CA;
+    --brand-soft: #EEF2FF;
+    --accent-main: #EC4899;
+    --accent-hover: #DB2777;
+    --accent-soft: #FDF2F8;
+    --gold: #F59E0B;
+    --gold-soft: #FEF3C7;
+    --success: #10B981;
+    --success-soft: #D1FAE5;
+    --warning: #F59E0B;
+    --error: #EF4444;
+    --error-soft: #FEE2E2;
+
+    --border-default: #E2E8F0;
+    --border-light: #F1F5F9;
+
+    --shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.04);
+    --shadow-md: 0 4px 12px rgba(15, 23, 42, 0.06);
+    --shadow-lg: 0 16px 40px rgba(15, 23, 42, 0.10);
+  }
+
+  .dark {
+    --background: 240 22% 9%;         /* #11111E */
+    --foreground: 213 31% 95%;        /* #ECEEF5 */
+    --card: 240 21% 13%;              /* #1A1A2E */
+    --card-foreground: 213 31% 95%;
+    --popover: 240 21% 13%;
+    --popover-foreground: 213 31% 95%;
+    --primary: 239 89% 71%;           /* #818CF8 indigo-400, brighter on dark */
+    --primary-foreground: 240 22% 9%;
+    --secondary: 240 17% 18%;
+    --secondary-foreground: 213 31% 95%;
+    --muted: 240 17% 18%;
+    --muted-foreground: 218 11% 65%;
+    --accent: 329 100% 71%;           /* #F472B6 pink-400 */
+    --accent-foreground: 240 22% 9%;
+    --destructive: 0 75% 60%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 240 14% 22%;
+    --input: 240 14% 22%;
+    --ring: 239 89% 71%;
+
+    --app-bg: #0B0B1F;
+    --surface: #15152A;
+    --surface-alt: #1C1C36;
+    --surface-2: #232342;
+    --text-primary: #F1F2F8;
+    --text-secondary: #CACEDB;
+    --text-tertiary: #98A0B8;
+
+    --brand: #818CF8;
+    --brand-hover: #A5B4FC;
+    --brand-soft: rgba(129, 140, 248, 0.16);
+    --accent-main: #F472B6;
+    --accent-hover: #F9A8D4;
+    --accent-soft: rgba(244, 114, 182, 0.18);
+    --gold: #FCD34D;
+    --gold-soft: rgba(252, 211, 77, 0.18);
+    --success: #34D399;
+    --success-soft: rgba(52, 211, 153, 0.16);
+    --warning: #FBBF24;
+    --error: #F87171;
+    --error-soft: rgba(248, 113, 113, 0.18);
+
+    --border-default: #2D2D4A;
+    --border-light: #1F1F3A;
+
+    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
+    --shadow-md: 0 6px 18px rgba(0, 0, 0, 0.5);
+    --shadow-lg: 0 22px 50px rgba(0, 0, 0, 0.65);
+  }
+
+  /* =========================================================
+     USER-SIDE THEME — "Verdant Growth"
+     Deep forest green + sage + coral/terracotta accents.
+     Scoped to `.user-theme` so the admin console keeps its
+     own (pink/indigo) identity untouched.
+     ========================================================= */
+  .user-theme {
+    --radius: 1rem;
+
+    /* Shadcn HSL tokens (so portaled dialogs/popovers match) */
+    --background: 40 20% 96%;
+    --foreground: 130 11% 11%;
+    --card: 0 0% 100%;
+    --card-foreground: 130 11% 11%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 130 11% 11%;
+    --primary: 136 29% 14%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 140 18% 90%;
+    --secondary-foreground: 130 11% 11%;
+    --muted: 40 15% 90%;
+    --muted-foreground: 136 8% 34%;
+    --accent: 11 58% 52%;
+    --accent-foreground: 0 0% 100%;
+    --border: 40 12% 80%;
+    --input: 40 12% 80%;
+    --ring: 136 29% 14%;
+
+    /* App tokens — light ("Botanical Bank") */
+    --app-bg: #F8F6F2;
+    --surface: #FFFFFF;
+    --surface-alt: #F2EFEA;
+    --surface-2: #E8E4DD;
+    --text-primary: #181E19;
+    --text-secondary: #515E54;
+    --text-tertiary: #88988C;
+
+    --brand: #1A3020;
+    --brand-hover: #2C4834;
+    --brand-soft: #E1EBE4;
+    --brand-ink: #FFFFFF;
+    --accent-main: #C95B42;
+    --accent-hover: #B04A33;
+    --accent-soft: #F5EBE8;
+    --gold: #B8935A;
+    --gold-soft: #F5EFE6;
+    --success: #285C43;
+    --success-soft: #E3EEE8;
+    --warning: #E0923D;
+    --error: #A83636;
+    --error-soft: #FBE9E9;
+
+    --border-default: #D3CDC4;
+    --border-light: #E8E4DD;
+
+    --shadow-sm: 0 1px 2px rgba(24, 30, 25, 0.05);
+    --shadow-md: 0 4px 16px rgba(24, 30, 25, 0.08);
+    --shadow-lg: 0 18px 44px rgba(24, 30, 25, 0.12);
+  }
+
+  .dark .user-theme {
+    --background: 135 11% 7%;
+    --foreground: 135 15% 95%;
+    --card: 135 11% 10%;
+    --card-foreground: 135 15% 95%;
+    --popover: 135 11% 10%;
+    --popover-foreground: 135 15% 95%;
+    --primary: 136 19% 65%;
+    --primary-foreground: 135 11% 7%;
+    --secondary: 136 19% 14%;
+    --secondary-foreground: 135 15% 95%;
+    --muted: 135 11% 13%;
+    --muted-foreground: 135 10% 66%;
+    --accent: 10 60% 61%;
+    --accent-foreground: 0 0% 100%;
+    --border: 135 11% 20%;
+    --input: 135 11% 20%;
+    --ring: 136 19% 65%;
+
+    --app-bg: #0F1310;
+    --surface: #161C17;
+    --surface-alt: #1D241F;
+    --surface-2: #252D27;
+    --text-primary: #F0F4F1;
+    --text-secondary: #A3B1A7;
+    --text-tertiary: #6D7E73;
+
+    --brand: #97B59F;
+    --brand-hover: #B2CBB9;
+    --brand-soft: #1E2D22;
+    --brand-ink: #0F1310;
+    --accent-main: #D97762;
+    --accent-hover: #ED927E;
+    --accent-soft: #3D211B;
+    --gold: #D1B381;
+    --gold-soft: #362B1D;
+    --success: #5D9F7F;
+    --success-soft: #182C23;
+    --warning: #E5A860;
+    --error: #C95B5B;
+    --error-soft: #3B1C1C;
+
+    --border-default: #2D3930;
+    --border-light: #232C25;
+
+    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.6);
+    --shadow-md: 0 8px 28px rgba(0, 0, 0, 0.7);
+    --shadow-lg: 0 24px 56px rgba(0, 0, 0, 0.8);
+  }
+
+  /* User-side typography — Cabinet Grotesk headings + Satoshi body */
+  .user-theme {
+    font-family: 'Satoshi', 'IBM Plex Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+  }
+  .user-theme h1, .user-theme h2, .user-theme h3, .user-theme h4, .user-theme h5,
+  .user-theme .font-display {
+    font-family: 'Cabinet Grotesk', 'Satoshi', sans-serif;
+  }
+  .user-theme .metric-num, .user-theme .font-mono {
+    font-family: 'JetBrains Mono', monospace;
+  }
+  .user-theme .text-label {
+    font-family: 'Satoshi', sans-serif;
+  }
+}
+
+
+@layer base {
+  * { @apply border-border; }
+  html, body, #root {
+    background: var(--app-bg);
+    color: var(--text-primary);
+  }
+  body {
+    font-family: 'Manrope', -apple-system, BlinkMacSystemFont, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    transition: background-color 0.2s ease, color 0.2s ease;
+  }
+  h1, h2, h3, h4, h5 {
+    font-family: 'Outfit', sans-serif;
+    letter-spacing: -0.02em;
+  }
+  .font-display { font-family: 'Outfit', sans-serif; }
+  .font-mono { font-family: 'JetBrains Mono', monospace; }
+  .text-label {
+    font-family: 'Outfit', sans-serif;
+    font-size: 0.75rem;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    font-weight: 700;
+    color: var(--text-secondary);
+  }
+}
+
+/* Semantic utility classes */
+@layer components {
+  .surface {
+    background: var(--surface);
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius);
+  }
+  .surface-alt {
+    background: var(--surface-alt);
+  }
+  .card-soft {
+    background: var(--surface);
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow-sm);
+    transition: box-shadow 200ms ease, transform 200ms ease, border-color 200ms ease;
+  }
+  .card-soft:hover {
+    box-shadow: var(--shadow-md);
+  }
+  .text-fg { color: var(--text-primary); }
+  .text-muted { color: var(--text-secondary); }
+  .text-faint { color: var(--text-tertiary); }
+  /* Make sure all inputs/textareas/selects always have legible text in both themes */
+  input, textarea, select {
+    color: var(--text-primary);
+    background-color: var(--surface);
+  }
+  input::placeholder, textarea::placeholder {
+    color: var(--text-tertiary);
+    opacity: 1;
+  }
+  .input-base {
+    background: var(--surface);
+    border: 1px solid var(--border-default);
+    color: var(--text-primary);
+    border-radius: 0.625rem;
+    padding: 0.625rem 0.875rem;
+    transition: border-color 150ms ease, box-shadow 150ms ease;
+  }
+  .input-base:focus {
+    outline: none;
+    border-color: var(--brand);
+    box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.18);
+  }
+  .btn-primary {
+    background: var(--brand);
+    color: #fff;
+    border-radius: 0.75rem;
+    padding: 0.7rem 1.125rem;
+    font-weight: 600;
+    transition: background-color 150ms ease, transform 150ms ease;
+  }
+  .btn-primary:hover { background: var(--brand-hover); }
+  .btn-accent {
+    background: var(--accent-main);
+    color: #fff;
+    border-radius: 0.75rem;
+    padding: 0.7rem 1.125rem;
+    font-weight: 600;
+    transition: background-color 150ms ease;
+  }
+  .btn-accent:hover { background: var(--accent-hover); }
+
+  .metric-num {
+    font-family: 'Outfit', sans-serif;
+    font-weight: 800;
+    letter-spacing: -0.04em;
+    color: var(--text-primary);
+  }
+
+  .pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    padding: 0.25rem 0.625rem;
+    border-radius: 999px;
+    font-size: 0.75rem;
+    font-weight: 600;
+  }
+  .pill-success { background: var(--success-soft); color: var(--success); }
+  .pill-warn { background: rgba(245, 158, 11, 0.16); color: var(--warning); }
+  .pill-error { background: var(--error-soft); color: var(--error); }
+  .pill-neutral { background: var(--surface-alt); color: var(--text-secondary); }
+  .pill-brand { background: var(--brand-soft); color: var(--brand); }
+  .pill-accent { background: var(--accent-soft); color: var(--accent-main); }
+
+  /* Modern hero gradient — vivid indigo→pink→gold */
+  .hero-gradient {
+    background:
+      radial-gradient(120% 100% at 0% 0%, rgba(236, 72, 153, 0.55) 0%, transparent 55%),
+      radial-gradient(120% 120% at 100% 0%, rgba(245, 158, 11, 0.45) 0%, transparent 55%),
+      linear-gradient(135deg, #4F46E5 0%, #6366F1 50%, #8B5CF6 100%);
+  }
+  .dark .hero-gradient {
+    background:
+      radial-gradient(120% 100% at 0% 0%, rgba(244, 114, 182, 0.45) 0%, transparent 55%),
+      radial-gradient(120% 120% at 100% 0%, rgba(251, 191, 36, 0.35) 0%, transparent 55%),
+      linear-gradient(135deg, #312E81 0%, #4338CA 50%, #6D28D9 100%);
+  }
+  /* User-side hero — deep olive forest with a warm terracotta glow (white-text safe) */
+  .user-theme .hero-gradient {
+    background:
+      radial-gradient(120% 110% at 100% 0%, rgba(201, 91, 66, 0.28) 0%, transparent 55%),
+      linear-gradient(140deg, #234A30 0%, #1A3020 55%, #101F15 100%);
+  }
+  .dark .user-theme .hero-gradient {
+    background:
+      radial-gradient(120% 110% at 100% 0%, rgba(217, 119, 98, 0.20) 0%, transparent 55%),
+      radial-gradient(130% 120% at 0% 0%, rgba(151, 181, 159, 0.14) 0%, transparent 55%),
+      linear-gradient(140deg, #1B2A20 0%, #131A15 55%, #0B0F0C 100%);
+  }
+  .grain::after {
+    content: "";
+    position: absolute; inset: 0;
+    background-image: radial-gradient(rgba(255,255,255,0.06) 1px, transparent 1px);
+    background-size: 3px 3px;
+    pointer-events: none;
+    opacity: 0.4;
+  }
+
+  /* User-side: pill buttons + floating glass nav */
+  .user-theme .btn-primary,
+  .user-theme .btn-accent { border-radius: 9999px; }
+  .user-theme .btn-primary { color: var(--brand-ink); }
+  .user-theme .pill { border-radius: 9999px; }
+  .glass-pill {
+    backdrop-filter: blur(18px);
+    -webkit-backdrop-filter: blur(18px);
+    background: color-mix(in srgb, var(--surface) 82%, transparent);
+    border: 1px solid var(--border-default);
+    box-shadow: 0 10px 36px rgba(5, 14, 9, 0.18);
+  }
+}
+
+@keyframes claim-pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.55; transform: scale(0.85); }
+}
+.animate-claim-pulse { animation: claim-pulse 1.8s ease-in-out infinite; }
+
+@keyframes fade-up {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.animate-fade-up { animation: fade-up 0.4s ease-out both; }
+
+::selection { background: var(--accent-soft); color: var(--text-primary); }
+
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--surface-2); border-radius: 6px; }
+::-webkit-scrollbar-thumb:hover { background: var(--text-tertiary); }
+
+/* Hide Emergent preview badge on all pages */
+#emergent-badge,
+a[id^="emergent-badge"],
+a[href*="emergent-badge"],
+a[href*="emergent.sh"][style*="position: fixed"] {
+  display: none !important;
+  visibility: hidden !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+  height: 0 !important;
+  width: 0 !important;
+}
+
+/* Keyboard handling — when an input is focused on mobile, push the bottom nav out of the way
+   and add scroll padding so the field stays visible above the keyboard. */
+html {
+  scroll-padding-bottom: 140px;
+}
+@media (max-width: 1023px) {
+  body.kb-open [data-testid="mobile-bottom-nav"] {
+    transform: translateY(150%);
+    transition: transform 200ms ease;
+  }
+  body.kb-open main {
+    padding-bottom: 24px !important;
+  }
+}
+[data-testid="mobile-bottom-nav"] {
+  transition: transform 200ms ease;
+}
