@@ -20,7 +20,7 @@ const STYLE_TOKENS = {
     icon: Info,
     pill: "bg-[color:var(--accent-soft)] text-[color:var(--accent-main)] border-[color:var(--accent-main)]/30",
     iconWell: "bg-[color:var(--accent-soft)] text-[color:var(--accent-main)]",
-    headerGrad: "from-[#1E3A8A] via-[#3730A3] to-[#5B5BD6]",
+    headerGrad: "from-[#1E40AF] via-[#1D4ED8] to-[#0EA5E9]",
   },
   success: {
     label: "Success",
@@ -364,11 +364,11 @@ export default function AdminAnnouncements() {
       {/* ===== HERO ===== */}
       <div
         className="relative overflow-hidden rounded-3xl text-white p-6 md:p-8"
-        style={{ background: "linear-gradient(120deg,#3F0825 0%,#7A0A45 38%,#C81A6E 72%,#E5097F 100%)" }}
+        style={{ background: "linear-gradient(120deg,#042F2E 0%,#134E4A 38%,#0D9488 72%,#0F766E 100%)" }}
         data-testid="ann-hero"
       >
         <div className="absolute -top-16 -right-10 w-72 h-72 rounded-full bg-white/10 blur-3xl" />
-        <div className="absolute -bottom-20 left-1/4 w-48 h-48 rounded-full bg-[#FF5BAA]/30 blur-3xl" />
+        <div className="absolute -bottom-20 left-1/4 w-48 h-48 rounded-full bg-[#14B8A6]/30 blur-3xl" />
         {/* Sound-wave bars decoration */}
         <svg className="absolute inset-y-0 right-0 h-full opacity-[0.12]" viewBox="0 0 200 200" preserveAspectRatio="none">
           {[10,30,50,70,90,110,130,150,170].map((x, i) => (
@@ -425,7 +425,7 @@ export default function AdminAnnouncements() {
       <Dialog open={open} onOpenChange={(o) => !submitting && setOpen(o)}>
         <DialogContent className="max-w-3xl w-[calc(100vw-2rem)] p-0 overflow-hidden rounded-3xl gap-0" data-testid="ann-modal">
           {/* Modal hero */}
-          <div className="relative bg-gradient-to-br from-[#9F0F50] via-[#C81A6E] to-[#E5097F] text-white p-6">
+          <div className="relative bg-gradient-to-br from-[#115E59] via-[#0D9488] to-[#0F766E] text-white p-6">
             <div className="absolute -top-10 -right-8 w-40 h-40 rounded-full bg-white/10 blur-3xl" />
             <button
               onClick={() => setOpen(false)}
@@ -653,7 +653,7 @@ export default function AdminAnnouncements() {
               onClick={save}
               disabled={submitting}
               data-testid="ann-save"
-              className="ml-auto inline-flex items-center gap-1.5 px-5 py-2.5 rounded-lg text-sm font-bold bg-gradient-to-r from-[color:var(--brand)] to-[#FF5BAA] text-white hover:opacity-90 disabled:opacity-50"
+              className="ml-auto inline-flex items-center gap-1.5 px-5 py-2.5 rounded-lg text-sm font-bold bg-gradient-to-r from-[color:var(--brand)] to-[#14B8A6] text-white hover:opacity-90 disabled:opacity-50"
             >
               <CheckCircle2 className="w-4 h-4" /> {submitting ? "Saving…" : editingId ? "Save changes" : "Create"}
             </button>
