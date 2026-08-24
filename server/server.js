@@ -111,6 +111,9 @@ async function flushProxyUsage() {
 }
 
 main().catch((err) => {
-  console.error("Failed to start:", err.message);
+  console.error("Failed to start:", err && err.message ? err.message : String(err));
+  if (err && Array.isArray(err.errors) && err.errors.length) {
+    for (const e of err.errors) console.error("  -", e && e.message ? e.message : e);
+  }
   process.exit(1);
 });

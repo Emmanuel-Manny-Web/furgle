@@ -5,7 +5,9 @@ const DATABASE_URL = process.env.DATABASE_URL || "postgres://localhost:5432/furg
 const pool = new Pool({
   connectionString: DATABASE_URL,
   max: 20,
-  ssl: process.env.DATABASE_SSL === "true" ? { rejectUnauthorized: false } : undefined,
+  // Railway (and most hosted Postgres) requires TLS with a self-signed cert.
+  // Enable it by default; set DATABASE_SSL=false to connect without TLS.
+  ssl: process.env.DATABASE_SSL === "false" ? undefined : { rejectUnauthorized: false },
 });
 
 // SQLite's datetime('now') emits "YYYY-MM-DD HH:MM:SS" in UTC. Match it so
