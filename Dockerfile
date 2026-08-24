@@ -11,7 +11,8 @@ RUN npm run build
 # ---- Stage 2: build the admin panel (CRA + craco, via Yarn) ----
 FROM node:20-alpine AS admin-build
 WORKDIR /app/admin
-RUN npm install -g yarn
+# `yarn` already exists in the base image (Corepack shim) — force-overwrite it.
+RUN npm install -g yarn --force
 COPY admin/package.json admin/yarn.lock ./
 RUN yarn install --frozen-lockfile --network-timeout 600000
 COPY admin/ ./
