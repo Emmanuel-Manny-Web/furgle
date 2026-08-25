@@ -18,12 +18,19 @@ export default function PaymentCallback() {
     }
     (async () => {
       try {
-        const r = await api(`/deposit/verify/${ref}`);
-        if (r.status === "success") {
+        let status = "pending";
+        // The gateway webhook is async, so poll briefly for the credit to land.
+        for (let i = 0; i < 8; i++) {
+          const r = await api(`/deposit/verify/${ref}`);
+          status = r.status;
+          if (status === "success" || status === "failed") break;
+          await new Promise((res) => setTimeout(res, 1500));
+        }
+        if (status === "success") {
           await refresh();
           setState("success");
-          setTimeout(() => navigate("/dashboard", { replace: true }), 1600);
-        } else if (r.status === "pending") {
+          setTimeout(() => navigate("/deposit", { replace: true }), 1600);
+        } else if (status === "pending") {
           setState("pending");
         } else {
           setState("failed");

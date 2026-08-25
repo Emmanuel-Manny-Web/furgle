@@ -698,17 +698,18 @@ router.post("/deposit/webhook/nekpay", async (req, res) => {
   }
 
   // Deposit (collection) notification (identified by the merchant order no).
-  if (body.mchtOrderNo) {
-    const dep = await db.get("SELECT * FROM deposits WHERE reference = ?", body.mchtOrderNo);
+  const mchOrderNo = body.mchOrderNo || body.mchtOrderNo;
+  if (mchOrderNo) {
+    const dep = await db.get("SELECT * FROM deposits WHERE reference = ?", mchOrderNo);
     if (!dep) return res.type("text/plain").send("success");
-    const s = String(body.orderStatus || "");
-    if (s === "1" || s.toLowerCase() === "success") {
+    const s = String(body.tradeResult ?? body.orderStatus ?? "").toLowerCase();
+    if (s === "1" || s === "success") {
       if (dep.status !== "success") {
         await db.run("UPDATE deposits SET status = 'success', updated_at = to_char(now() AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI:SS') WHERE id = ?", dep.id);
         await addTransaction(dep.user_id, "deposit", dep.amount, "Deposit", { reference: dep.reference, gateway: "nekpay" });
         await creditDepositBonus(dep.user_id, dep.amount, dep.reference);
       }
-    } else if (s === "2" || s.toLowerCase() === "failed") {
+    } else if (s === "2" || s === "3" || s === "failed") {
       await db.run("UPDATE deposits SET status = 'failed', updated_at = to_char(now() AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI:SS') WHERE id = ?", dep.id);
     }
     return res.type("text/plain").send("success");
