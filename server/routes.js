@@ -1373,10 +1373,18 @@ router.post("/banks/resolve", authMiddleware, async (req, res) => {
   const settings = await getAllSettings();
   const payoutGateway = settings.payout_gateway || "nomba";
 
-  // Gateways with a native name-enquiry API resolve directly.
+  // Gateways with a native name-enquiry API resolve directly. Re-resolve the
+  // bank code from the bank name first, so a stale/mismatched code from the
+  // client (e.g. a Paystack code) doesn't break the enquiry for the current
+  // gateway (e.g. Duplo).
   if (["paystack", "duplo", "nomba", "kora"].includes(payoutGateway)) {
-    const name = await resolveAccountViaGateway(payoutGateway, account_number, bank_code, settings);
-    if (name) return res.json({ account_name: name, account_number, bank_code });
+    let targetCode = bank_code;
+    if (bank_name) {
+      const mapped = await resolveBankCodeForGateway(payoutGateway, bank_name, settings);
+      if (mapped) targetCode = mapped;
+    }
+    const name = await resolveAccountViaGateway(payoutGateway, account_number, targetCode, settings);
+    if (name) return res.json({ account_name: name, account_number, bank_code: targetCode });
     return res.status(502).json({ detail: "Account name could not be resolved. Please check the account number and bank, or enter the name manually.", manual: true });
   }
 
