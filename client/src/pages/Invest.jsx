@@ -17,18 +17,17 @@ export default function Invest() {
 
   const open = (p) => {
     setSelected(p);
-    setAmount(String(p.min_amount || p.price || ""));
+    setAmount(String(p.price || ""));
   };
 
   const submit = async (e) => {
     e.preventDefault();
-    const amt = Number(amount);
-    if (!amt || amt <= 0) return toast("Enter a valid amount", "error");
-    if (amt < (selected.min_amount || 0)) return toast(`Minimum is ${money(selected.min_amount)}`, "error");
+    const amt = Number(selected?.price);
+    if (!amt || amt <= 0) return toast("Invalid plan price", "error");
     if (amt > (user?.wallet_balance || 0)) return toast("Insufficient balance", "error");
     setBusy(true);
     try {
-      await api("/invest", { method: "POST", body: { product_id: selected.id, amount: amt } });
+      await api("/invest", { method: "POST", body: { product_id: selected.id } });
       toast("Investment started!", "success");
       await refresh();
       setSelected(null);
@@ -88,10 +87,8 @@ export default function Invest() {
               <input
                 className="input"
                 type="number"
-                min={selected.min_amount}
                 value={amount}
-                onChange={(e) => setAmount(e.target.value)}
-                autoFocus
+                readOnly
               />
             </div>
             <div style={{ fontSize: 12, color: "var(--text-3)", marginBottom: 14 }}>

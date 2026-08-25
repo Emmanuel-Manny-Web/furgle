@@ -131,7 +131,9 @@ export default function Dashboard() {
           style={{ justifyContent: "space-between" }}
         >
           <span style={{ display: "flex", alignItems: "center", gap: 8 }}><Icon.Gift /> Daily claim — {money(claim.amount)}</span>
-          {claim.can_claim ? <span>Claim →</span> : claiming ? "…" : "Claimed"}
+          {claim.has_invested === false
+            ? <span>Invest to unlock</span>
+            : claim.can_claim ? <span>Claim →</span> : claiming ? "…" : "Claimed"}
         </button>
       )}
 

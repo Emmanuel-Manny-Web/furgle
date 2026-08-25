@@ -322,11 +322,12 @@ router.get("/investments", authMiddleware, async (req, res) => {
 });
 
 router.post("/invest", authMiddleware, async (req, res) => {
-  const { product_id, amount } = req.body || {};
+  const { product_id } = req.body || {};
   const product = await db.get("SELECT * FROM products WHERE id = ? AND is_active = 1", product_id);
   if (!product) return res.status(404).json({ detail: "Product not found" });
-  const amt = Number(amount);
-  if (amt < product.min_amount) return res.status(400).json({ detail: "Amount below minimum" });
+  // The package price is fixed — ignore any client-supplied amount.
+  const amt = Number(product.price || product.min_amount || 0);
+  if (!amt || amt <= 0) return res.status(400).json({ detail: "Invalid product price" });
   if (req.user.wallet_balance < amt) return res.status(400).json({ detail: "Insufficient balance" });
 
   const id = "inv_" + uuidv4().replace(/-/g, "").slice(0, 16);
@@ -1496,19 +1497,22 @@ router.get("/announcements/next", async (req, res) => {
 router.get("/daily-claim/status", authMiddleware, async (req, res) => {
   const enabled = await getSetting("daily_claim_enabled", "true") === "true";
   const amount = Number(await getSetting("daily_claim_amount", "100"));
+  const hasInvested = !!(await db.get("SELECT 1 FROM investments WHERE user_id = ? LIMIT 1", req.user.id));
   const last = req.user.last_daily_claim_at;
-  let canClaim = true, cooldown = 0;
+  let canClaim = enabled && hasInvested, cooldown = 0;
   if (last) {
     const elapsed = (Date.now() - new Date(last).getTime()) / 1000;
     cooldown = Math.max(0, 86400 - elapsed);
-    canClaim = cooldown <= 0;
+    canClaim = canClaim && cooldown <= 0;
   }
-  res.json({ enabled, amount, can_claim: canClaim, cooldown_remaining_sec: Math.floor(cooldown), last_claim_at: last });
+  res.json({ enabled, amount, has_invested: hasInvested, can_claim: canClaim, cooldown_remaining_sec: Math.floor(cooldown), last_claim_at: last });
 });
 
 router.post("/daily-claim/claim", authMiddleware, async (req, res) => {
   const enabled = await getSetting("daily_claim_enabled", "true") === "true";
   if (!enabled) return res.status(400).json({ detail: "Daily claim disabled" });
+  const hasInvested = !!(await db.get("SELECT 1 FROM investments WHERE user_id = ? LIMIT 1", req.user.id));
+  if (!hasInvested) return res.status(400).json({ detail: "You need an active investment to claim the daily bonus" });
   const last = req.user.last_daily_claim_at;
   if (last && (Date.now() - new Date(last).getTime()) / 1000 < 86400) {
     return res.status(400).json({ detail: "Already claimed today" });
