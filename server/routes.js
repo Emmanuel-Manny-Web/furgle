@@ -1172,7 +1172,8 @@ function normalizeBankName(name) {
     .replace(/bank(s)?/g, "")
     .replace(/plc/g, "")
     .replace(/limited|ltd/g, "")
-    .replace(/microfinance|mf?b/g, "")
+    .replace(/microfinance|mfb/g, "")
+    .replace(/of/g, "")
     .replace(/nigeria/g, "");
 }
 
@@ -1194,29 +1195,25 @@ function findBankByName(list, name) {
 }
 
 // Map common Nigerian bank name aliases to a canonical key for cross-gateway
-// matching. Extend as needed.
+// matching. Keys are the normalised short/alternate name; values are the
+// canonical normalised full name.
 const BANK_ALIASES = {
-  gtbank: "guarantytrust",
+  // Guaranty Trust Bank (GTB / GTCO / "Guarantee" spelling)
   gtb: "guarantytrust",
+  gt: "guarantytrust",
+  gtco: "guarantytrust",
   guaranteetrust: "guarantytrust",
-  guarantytrustbank: "guarantytrust",
-  uba: "unitedbankforafrica",
-  fcmb: "firstcitymonumentbank",
-  firstcitymonument: "firstcitymonumentbank",
-  access: "accessbank",
-  accessbank: "accessbank",
-  zenithbank: "zenithbank",
-  zenith: "zenithbank",
-  firstbank: "firstbank",
-  firstbankofnigeria: "firstbank",
-  sterlingbank: "sterlingbank",
-  sterling: "sterlingbank",
-  kudamicrofinancebank: "kudamicrofinancebank",
-  kuda: "kudamicrofinancebank",
-  moniepointmicrofinancebank: "moniepointmicrofinancebank",
-  moniepoint: "moniepointmicrofinancebank",
-  palmpay: "palmpay",
-  opay: "opay",
+  // United Bank for Africa (UBA)
+  uba: "unitedforafrica",
+  // First City Monument Bank (FCMB)
+  fcmb: "firstcitymonument",
+  // First Bank of Nigeria (FBN)
+  fbn: "first",
+  // Stanbic IBTC Bank
+  stanbic: "stanbicibtc",
+  ibtc: "stanbicibtc",
+  // Polaris Bank (formerly Skye Bank)
+  skye: "polaris",
 };
 
 function bankCanonicalKey(name) {
