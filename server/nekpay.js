@@ -101,7 +101,7 @@ async function createDeposit(params, cfg) {
     if (r.body.respCode && r.body.respCode !== "SUCCESS") {
       return { error: r.body.tradeMsg || r.body.respMsg || r.body.errorMsg || "Nekpay collection failed" };
     }
-    return { data: { payUrl: r.body.payUrl || null, orderNo: r.body.orderNo || null, mchOrderNo: body.mch_order_no } };
+    return { data: { payUrl: r.body.payInfo || r.body.payUrl || null, orderNo: r.body.orderNo || null, mchOrderNo: body.mch_order_no } };
   } catch (err) {
     return { error: err.message };
   }
