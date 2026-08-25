@@ -1221,7 +1221,11 @@ const BANK_ALIASES = {
 
 function bankCanonicalKey(name) {
   const norm = normalizeBankName(name);
-  return BANK_ALIASES[norm] || norm;
+  if (BANK_ALIASES[norm]) return BANK_ALIASES[norm];
+  // OPay is listed under different names across gateways (e.g. Duplo calls it
+  // "Paycom(Opay)"), so normalise any OPay/Paycom variant to a single key.
+  if (norm.includes("opay") || norm.includes("paycom")) return "opay";
+  return norm;
 }
 
 // Resolve the correct bank code for a given gateway using the stored bank name.
