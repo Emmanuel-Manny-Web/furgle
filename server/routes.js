@@ -1169,12 +1169,12 @@ function normalizeBankName(name) {
   if (!name) return "";
   return String(name)
     .toLowerCase()
+    .replace(/\bof\b/g, "")
     .replace(/[^a-z0-9]/g, "")
     .replace(/bank(s)?/g, "")
     .replace(/plc/g, "")
     .replace(/limited|ltd/g, "")
     .replace(/microfinance|mfb/g, "")
-    .replace(/of/g, "")
     .replace(/nigeria/g, "");
 }
 
