@@ -1497,7 +1497,7 @@ router.get("/announcements/next", async (req, res) => {
 router.get("/daily-claim/status", authMiddleware, async (req, res) => {
   const enabled = await getSetting("daily_claim_enabled", "true") === "true";
   const amount = Number(await getSetting("daily_claim_amount", "100"));
-  const hasInvested = !!(await db.get("SELECT 1 FROM investments WHERE user_id = ? LIMIT 1", req.user.id));
+  const hasInvested = !!(await db.get("SELECT 1 FROM investments WHERE user_id = ? AND status = 'active' LIMIT 1", req.user.id));
   const last = req.user.last_daily_claim_at;
   let canClaim = enabled && hasInvested, cooldown = 0;
   if (last) {
@@ -1511,7 +1511,7 @@ router.get("/daily-claim/status", authMiddleware, async (req, res) => {
 router.post("/daily-claim/claim", authMiddleware, async (req, res) => {
   const enabled = await getSetting("daily_claim_enabled", "true") === "true";
   if (!enabled) return res.status(400).json({ detail: "Daily claim disabled" });
-  const hasInvested = !!(await db.get("SELECT 1 FROM investments WHERE user_id = ? LIMIT 1", req.user.id));
+  const hasInvested = !!(await db.get("SELECT 1 FROM investments WHERE user_id = ? AND status = 'active' LIMIT 1", req.user.id));
   if (!hasInvested) return res.status(400).json({ detail: "You need an active investment to claim the daily bonus" });
   const last = req.user.last_daily_claim_at;
   if (last && (Date.now() - new Date(last).getTime()) / 1000 < 86400) {
