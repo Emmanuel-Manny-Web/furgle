@@ -137,13 +137,15 @@ async function createPayout(params, cfg) {
 }
 
 // Nekpay Nigerian bank codes (NGRxxx). Used to translate the stored bank name
-// into the code Nekpay expects for a payout.
+// into the code Nekpay expects for a payout. Sourced from Nekpay's docs.
 const BANKS = [
   { code: "NGR044", name: "Access Bank" },
   { code: "NGR050", name: "Ecobank Nigeria" },
+  { code: "NGR000019", name: "Enterprise Bank" },
   { code: "NGR070", name: "Fidelity Bank" },
   { code: "NGR071", name: "First Bank of Nigeria" },
   { code: "NGR214", name: "First City Monument Bank" },
+  { code: "NGR00103", name: "Globus Bank" },
   { code: "NGR058", name: "Guaranty Trust Bank" },
   { code: "NGR301", name: "Jaiz Bank" },
   { code: "NGR082", name: "Keystone Bank" },
@@ -153,6 +155,7 @@ const BANKS = [
   { code: "NGR068", name: "Standard Chartered Bank" },
   { code: "NGR232", name: "Sterling Bank" },
   { code: "NGR100", name: "Suntrust Bank" },
+  { code: "NGR5310", name: "Sparkle Microfinance Bank" },
   { code: "NGR302", name: "TAJ Bank" },
   { code: "NGR032", name: "Union Bank of Nigeria" },
   { code: "NGR033", name: "United Bank For Africa" },
@@ -160,12 +163,17 @@ const BANKS = [
   { code: "NGR566", name: "VFD Microfinance Bank" },
   { code: "NGR035", name: "Wema Bank" },
   { code: "NGR057", name: "Zenith Bank" },
-  { code: "NGR031", name: "Premium Trust Bank" },
-  { code: "NGR999993", name: "Moniepoint MFB" },
-  { code: "NGR999991", name: "PalmPay" },
-  { code: "NGR526", name: "Parallex Bank" },
   { code: "NGR801", name: "Abbey Mortgage Bank" },
-  { code: "NGR5310", name: "Sparkle Microfinance Bank" },
+  { code: "NGR035A", name: "TOOLS by WEMA" },
+  { code: "NGR999992", name: "Paycom (Opay)" },
+  { code: "NGR20009", name: "Opay" },
+  { code: "NGR100031", name: "FCMB Easy Account" },
+  { code: "NGR999993", name: "Moniepoint MFB" },
+  { code: "NGR031", name: "Premium Trust Bank" },
+  { code: "NGR1543", name: "Momo Payment Service Bank" },
+  { code: "NGR565", name: "One Finance" },
+  { code: "NGR526", name: "Parallex Bank" },
+  { code: "NGR999991", name: "PalmPay" },
 ];
 
 module.exports = { BASE, sign, getConfig, createDeposit, createPayout, BANKS };
