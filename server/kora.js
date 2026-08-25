@@ -99,11 +99,17 @@ async function isVirtualAccountPaid(reference, expectedAmount, cfg) {
   return { paid: ["success", "paid"].includes(s) && Number.isFinite(amt) && amt >= Number(expectedAmount) };
 }
 
+let _banksCache = { at: 0, data: null };
 async function listBanks(cfg) {
   try {
+    if (_banksCache.data && Date.now() - _banksCache.at < 60 * 60 * 1000) {
+      return { data: _banksCache.data };
+    }
     const r = await request("GET", "/misc/banks?countryCode=NG", null, cfg, cfg.publicKey);
     if (!r.body || !r.body.data) return { error: (r.body && (r.body.message || r.body.error)) || "Failed to list banks" };
-    return { data: (r.body.data || []).map((b) => ({ code: String(b.code), name: b.name })) };
+    const data = (r.body.data || []).map((b) => ({ code: String(b.code), name: b.name }));
+    _banksCache = { at: Date.now(), data };
+    return { data };
   } catch (err) {
     return { error: err.message };
   }

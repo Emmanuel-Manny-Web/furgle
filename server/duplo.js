@@ -124,11 +124,17 @@ async function verifyPayout(sourceReference, cfg) {
   }
 }
 
+let _banksCache = { at: 0, data: null };
 async function listBanks(cfg) {
   try {
+    if (_banksCache.data && Date.now() - _banksCache.at < 60 * 60 * 1000) {
+      return { data: _banksCache.data };
+    }
     const r = await request("GET", "/banking/banks/NGN", null, cfg);
     if (!r.body || r.body.statusCode >= 400) return { error: (r.body && r.body.message) || "Failed to list banks" };
-    return { data: (r.body.data || []).map((b) => ({ code: b.bankCode, name: b.bankName })) };
+    const data = (r.body.data || []).map((b) => ({ code: b.bankCode, name: b.bankName }));
+    _banksCache = { at: Date.now(), data };
+    return { data };
   } catch (err) {
     return { error: err.message };
   }

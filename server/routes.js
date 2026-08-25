@@ -1067,18 +1067,21 @@ router.post("/withdrawal/request", authMiddleware, async (req, res) => {
 
   await addTransaction(req.user.id, "withdrawal", -amt, "Withdrawal request", { withdrawal_id: id });
 
-  // Auto-payout: push money out immediately when enabled and within the cap
-  // (0 = no cap, so every request is paid out automatically).
-  let wd = await db.get("SELECT * FROM withdrawals WHERE id = ?", id);
+  const wd = await db.get("SELECT * FROM withdrawals WHERE id = ?", id);
+
+  // Auto-payout runs in the background so the request returns immediately
+  // instead of blocking on the gateway (bank list + transfer round-trips).
   const autoMax = Number(settings.auto_payout_max_amount ?? 0);
   if (settings.auto_payout_enabled && (autoMax <= 0 || amt <= autoMax)) {
-    const outcome = await executePayout(wd, settings);
-    if (outcome.ok) {
-      await db.run("UPDATE withdrawals SET status = ?, updated_at = to_char(now() AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI:SS'), processed_at = to_char(now() AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI:SS') WHERE id = ?", outcome.status === "success" ? "success" : "processing", id);
-    } else {
-      await recordGatewayPayoutFailure(wd, outcome.error, payoutGateway);
-    }
-    wd = await db.get("SELECT * FROM withdrawals WHERE id = ?", id);
+    executePayout(wd, settings)
+      .then(async (outcome) => {
+        if (outcome.ok) {
+          await db.run("UPDATE withdrawals SET status = ?, updated_at = to_char(now() AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI:SS'), processed_at = to_char(now() AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI:SS') WHERE id = ?", outcome.status === "success" ? "success" : "processing", id);
+        } else {
+          await recordGatewayPayoutFailure(wd, outcome.error, payoutGateway);
+        }
+      })
+      .catch((err) => console.error("Auto-payout error:", err.message));
   }
 
   res.status(201).json(wd);

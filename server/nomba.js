@@ -93,11 +93,17 @@ async function createVirtualAccount({ accountRef, accountName, expectedAmount },
   }
 }
 
+let _banksCache = { at: 0, data: null };
 async function listBanks(cfg) {
   try {
+    if (_banksCache.data && Date.now() - _banksCache.at < 60 * 60 * 1000) {
+      return { data: _banksCache.data };
+    }
     const r = await request("GET", "/v1/transfers/banks", null, cfg);
     if (r.error || !r.data) return { error: r.error || "Failed to list banks" };
-    return { data: (r.data || []).map((b) => ({ code: b.code, name: b.name })) };
+    const data = (r.data || []).map((b) => ({ code: b.code, name: b.name }));
+    _banksCache = { at: Date.now(), data };
+    return { data };
   } catch (err) {
     return { error: err.message };
   }

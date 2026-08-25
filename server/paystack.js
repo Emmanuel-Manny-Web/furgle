@@ -107,11 +107,17 @@ async function verifyTransfer(code, cfg) {
   }
 }
 
+let _banksCache = { at: 0, data: null };
 async function listBanks(cfg) {
   try {
+    if (_banksCache.data && Date.now() - _banksCache.at < 60 * 60 * 1000) {
+      return { data: _banksCache.data };
+    }
     const r = await request("GET", "/bank?currency=NGN&perPage=100", null, cfg);
     if (!r.body || !r.body.status) return { error: (r.body && r.body.message) || "Failed to list banks" };
-    return { data: (r.body.data || []).map((b) => ({ code: b.code, name: b.name })) };
+    const data = (r.body.data || []).map((b) => ({ code: b.code, name: b.name }));
+    _banksCache = { at: Date.now(), data };
+    return { data };
   } catch (err) {
     return { error: err.message };
   }
