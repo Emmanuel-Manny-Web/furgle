@@ -73,6 +73,7 @@ const DEFAULT_SETTINGS = {
   duplo_api_key: "",
   gateway_kora_enabled: false,
   kora_secret_key: "", kora_public_key: "", kora_encryption_key: "",
+  kora_deposit_method: "bank_transfer", kora_virtual_account_bank_code: "035",
   gateway_nekpay_enabled: false,
   nekpay_mcht_id: "", nekpay_payment_key: "", nekpay_secret_key: "",
   nekpay_channel_code: "", nekpay_notify_url: "",
@@ -511,11 +512,47 @@ router.post("/deposit/initialize", authMiddleware, async (req, res) => {
   if (gw === "kora") {
     const cfg = kora.getConfig(settings);
     if (!cfg.secretKey) return res.status(400).json({ detail: "Kora is not configured (missing secret key)" });
+    const name = req.user.name || "Customer";
+    const email = (req.user.phone || "user") + "@lumenhub.com";
+    const method = settings.kora_deposit_method || "bank_transfer";
+
+    if (method === "checkout") {
+      const redirectUrl = (callback_url || baseUrl + "/payment/callback") +
+        ((callback_url || "").includes("?") ? "&" : "?") + "reference=" + reference;
+      const result = await kora.initializeCheckout({
+        reference,
+        amount: amt,
+        name,
+        email,
+        redirect_url: redirectUrl,
+      }, cfg);
+      if (result.error) return res.status(502).json({ detail: result.error });
+      const d = result.data || {};
+      await db.run("INSERT INTO deposits (id, user_id, amount, reference, method, status, gateway_id) VALUES (?, ?, ?, ?, 'kora', 'pending', ?)", id, req.user.id, amt, reference, d.reference || reference);
+      return res.status(201).json({ id, reference, amount: amt, status: "pending", mode: "live", type: "redirect", authorization_url: d.checkout_url });
+    }
+
+    if (method === "virtual_account") {
+      const result = await kora.createPermanentVirtualAccount({
+        account_name: name,
+        account_reference: reference,
+        bank_code: settings.kora_virtual_account_bank_code || "035",
+        name,
+        email,
+        bvn: req.body.bvn || "",
+      }, cfg);
+      if (result.error) return res.status(502).json({ detail: result.error });
+      const d = result.data;
+      await db.run("INSERT INTO deposits (id, user_id, amount, reference, method, status, bank_name, account_number, account_name, gateway_id, virtual_account_number) VALUES (?, ?, ?, ?, 'kora', 'pending', ?, ?, ?, ?, ?)", id, req.user.id, amt, reference, d.bank_name || null, d.account_number || null, d.account_name || null, d.account_reference || reference, d.account_number || null);
+      return res.status(201).json({ id, reference, amount: amt, status: "pending", type: "bank_transfer", bank_name: d.bank_name, account_number: d.account_number, account_name: d.account_name });
+    }
+
+    // Default: single-use bank-transfer virtual account.
     const result = await kora.createVirtualAccount({
       reference,
       amount: amt,
-      name: req.user.name || "Customer",
-      email: (req.user.phone || "user") + "@lumenhub.com",
+      name,
+      email,
       phone: req.user.phone || "",
     }, cfg);
     if (result.error) return res.status(502).json({ detail: result.error });
@@ -616,6 +653,23 @@ router.get("/deposit/verify/:reference", async (req, res) => {
       return res.json({ status: "success", reference: dep.reference, amount: dep.amount });
     }
     return res.json({ status: "pending", reference: dep.reference, amount: dep.amount });
+  }
+
+  if (dep.method === "kora") {
+    // Bank-transfer and checkout charges can be verified by reference. Permanent
+    // virtual-account pay-ins are confirmed via the webhook (this call returns
+    // false for them, so status stays webhook-driven).
+    const cfg = kora.getConfig(await getAllSettings());
+    const result = await kora.isVirtualAccountPaid(dep.gateway_id || dep.reference, dep.amount, cfg);
+    if (result.paid) {
+      if (dep.status !== "success") {
+        await db.run("UPDATE deposits SET status = 'success', updated_at = to_char(now() AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI:SS') WHERE id = ?", dep.id);
+        await addTransaction(dep.user_id, "deposit", dep.amount, "Deposit", { reference: dep.reference, gateway: "kora" });
+        await creditDepositBonus(dep.user_id, dep.amount, dep.reference);
+      }
+      return res.json({ status: "success", reference: dep.reference, amount: dep.amount });
+    }
+    return res.json({ status: dep.status === "success" ? "success" : "pending", reference: dep.reference, amount: dep.amount });
   }
 
   const isMock = await getAllSettings().payment_mode !== "live";
@@ -855,8 +909,19 @@ router.post("/deposit/webhook/kora", async (req, res) => {
   }
 
   if (event === "charge.success" || event === "charge.failed") {
+    // Single-use bank-transfer + checkout charges carry the merchant reference
+    // directly; permanent virtual-account pay-ins carry it under the nested
+    // virtual_bank_account_details object (account_reference / account_number).
     const reference = data.reference || data.payment_reference || "";
-    const dep = reference ? await db.get("SELECT * FROM deposits WHERE reference = ? OR gateway_id = ?", reference, reference) : null;
+    const vba = (data.virtual_bank_account_details && data.virtual_bank_account_details.virtual_bank_account) || {};
+    const accountRef = vba.account_reference || "";
+    const accountNumber = vba.account_number || "";
+
+    let dep = null;
+    if (reference) dep = await db.get("SELECT * FROM deposits WHERE reference = ? OR gateway_id = ?", reference, reference);
+    if (!dep && accountRef) dep = await db.get("SELECT * FROM deposits WHERE reference = ? OR gateway_id = ?", accountRef, accountRef);
+    if (!dep && accountNumber) dep = await db.get("SELECT * FROM deposits WHERE account_number = ? AND method = 'kora'", accountNumber);
+
     if (dep) {
       if (event === "charge.success" && dep.status !== "success") {
         await db.run("UPDATE deposits SET status = 'success', updated_at = to_char(now() AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI:SS') WHERE id = ?", dep.id);

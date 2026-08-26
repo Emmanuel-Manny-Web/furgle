@@ -81,6 +81,71 @@ async function createVirtualAccount({ reference, amount, name, email, phone }, c
   }
 }
 
+// Create a permanent/fixed virtual bank account for a customer.
+// Endpoint: POST /virtual-bank-account (requires account_name, account_reference,
+// permanent, bank_code, customer and kyc.bvn).
+async function createPermanentVirtualAccount({ account_name, account_reference, bank_code, name, email, bvn }, cfg) {
+  try {
+    const fullName = (account_name || name || "Customer").trim() || "Customer";
+    const r = await request("POST", "/virtual-bank-account", {
+      account_name: fullName,
+      account_reference,
+      permanent: true,
+      bank_code: bank_code || "035",
+      customer: {
+        name: (name || fullName).trim() || fullName,
+        email: email || "customer@lumenhub.com",
+      },
+      kyc: {
+        bvn: bvn || "",
+      },
+    }, cfg);
+    if (!r.body || !r.body.data) return { error: (r.body && (r.body.message || r.body.error)) || "Kora virtual account creation failed" };
+    const d = r.body.data;
+    return {
+      data: {
+        account_reference: d.account_reference || account_reference,
+        unique_id: d.unique_id || null,
+        account_number: d.account_number || null,
+        account_name: d.account_name || fullName,
+        bank_name: d.bank_name || "Kora",
+        bank_code: d.bank_code || bank_code || null,
+      },
+    };
+  } catch (err) {
+    return { error: err.message };
+  }
+}
+
+// Initialize a hosted checkout charge. Endpoint: POST /charges/initialize.
+// Returns a checkout_url that the customer is redirected to.
+async function initializeCheckout({ reference, amount, name, email, redirect_url, narration }, cfg) {
+  try {
+    const fullName = (name || "Customer").trim() || "Customer";
+    const r = await request("POST", "/charges/initialize", {
+      reference,
+      amount: Number(amount),
+      currency: "NGN",
+      customer: {
+        name: fullName,
+        email: email || "customer@lumenhub.com",
+      },
+      ...(redirect_url ? { redirect_url } : {}),
+      ...(narration ? { narration: narration.slice(0, 200) } : {}),
+    }, cfg);
+    if (!r.body || !r.body.data) return { error: (r.body && (r.body.message || r.body.error)) || "Kora checkout initialization failed" };
+    const d = r.body.data;
+    return {
+      data: {
+        reference: d.reference || reference,
+        checkout_url: d.checkout_url || null,
+      },
+    };
+  } catch (err) {
+    return { error: err.message };
+  }
+}
+
 // Verify a bank-transfer charge by its reference.
 async function verifyCharge(reference, cfg) {
   try {
@@ -182,6 +247,7 @@ async function queryBalance(cfg) {
 }
 
 module.exports = {
-  getConfig, createVirtualAccount, verifyCharge, isVirtualAccountPaid, listBanks, resolveAccount,
+  getConfig, createVirtualAccount, createPermanentVirtualAccount, initializeCheckout,
+  verifyCharge, isVirtualAccountPaid, listBanks, resolveAccount,
   createPayout, verifyPayout, queryBalance,
 };

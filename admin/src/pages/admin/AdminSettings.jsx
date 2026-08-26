@@ -203,6 +203,8 @@ export default function AdminSettings() {
         kora_secret_key: s.kora_secret_key || "",
         kora_public_key: s.kora_public_key || "",
         kora_encryption_key: s.kora_encryption_key || "",
+        kora_deposit_method: s.kora_deposit_method || "bank_transfer",
+        kora_virtual_account_bank_code: s.kora_virtual_account_bank_code || "035",
         nekpay_mcht_id: s.nekpay_mcht_id || "",
         nekpay_payment_key: s.nekpay_payment_key || "",
         nekpay_secret_key: s.nekpay_secret_key || "",
@@ -626,6 +628,19 @@ export default function AdminSettings() {
                 <SecretField label="Public key" value={s.kora_public_key} onChange={(v) => setS({ ...s, kora_public_key: v })} placeholder="pk_test_..." testid="kora-public-key" />
                 <SecretField label="Encryption key" value={s.kora_encryption_key} onChange={(v) => setS({ ...s, kora_encryption_key: v })} testid="kora-encryption-key" />
               </div>
+              <div className="mt-6">
+                <div className="text-[10px] uppercase tracking-[0.22em] font-bold text-[color:var(--text-tertiary)] mb-3">Kora deposit method</div>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <GatewayCard active={(s.kora_deposit_method || "bank_transfer") === "bank_transfer"} label="Default" name="Bank transfer" sub="Single-use virtual account" onClick={() => setS({ ...s, kora_deposit_method: "bank_transfer" })} testid="kora-method-bank-transfer" />
+                  <GatewayCard active={s.kora_deposit_method === "virtual_account"} label="Fixed" name="Virtual account" sub="Permanent account (needs BVN)" onClick={() => setS({ ...s, kora_deposit_method: "virtual_account" })} testid="kora-method-virtual-account" />
+                  <GatewayCard active={s.kora_deposit_method === "checkout"} label="Hosted" name="Checkout" sub="Redirect to Kora checkout" onClick={() => setS({ ...s, kora_deposit_method: "checkout" })} testid="kora-method-checkout" />
+                </div>
+              </div>
+              {s.kora_deposit_method === "virtual_account" && (
+                <div className="mt-4">
+                  <Field label="Virtual account bank code" value={s.kora_virtual_account_bank_code} text onChange={(v) => setS({ ...s, kora_virtual_account_bank_code: v })} placeholder="035" sub="Bank providing the fixed virtual account (035=Wema, 070=Fidelity, 103=Globus, 033=UBA, 214=FCMB)." testid="kora-va-bank-code" />
+                </div>
+              )}
             </Section>
 
             <Section title="Nekpay credentials" hint="Used for Nekpay deposits (collection) & payouts (payment on behalf). Credentials come from your Nekpay merchant backend.">
