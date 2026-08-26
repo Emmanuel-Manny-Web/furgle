@@ -6,7 +6,7 @@ import { formatNaira, formatDate, relativeTime } from "@/lib/format";
 import { readCache, writeCache } from "@/hooks/useCachedData";
 import { toast } from "sonner";
 import {
-  ArrowLeft, ShieldAlert, CircleAlert, Banknote, CheckCircle2, RefreshCw, User as UserIcon, Wallet,
+  ArrowLeft, ShieldAlert, CircleAlert, Banknote, CheckCircle2, RefreshCw, User as UserIcon, Wallet, Clock,
 } from "lucide-react";
 
 const GATEWAY_LABELS = {
@@ -15,6 +15,7 @@ const GATEWAY_LABELS = {
   juntpay: "JuntPay",
   duplo: "Duplo",
   kora: "Kora",
+  nekpay: "Nekpay",
 };
 
 export default function AdminGatewayPayoutFailures() {
@@ -55,6 +56,7 @@ export default function AdminGatewayPayoutFailures() {
   };
 
   const isInsufficient = (a) => /insufficient/i.test(a.message || "");
+  const isStuck = (a) => a.type === "payout_stuck";
 
   return (
     <AdminLayout title="">
@@ -103,25 +105,27 @@ export default function AdminGatewayPayoutFailures() {
         {!loading && items.length === 0 && (
           <div className="card-soft p-12 text-center" data-testid="gpf-empty">
             <CircleAlert className="w-12 h-12 mx-auto opacity-30 text-[color:var(--success)]" />
-            <div className="font-semibold text-[color:var(--text-primary)] mt-3">No outstanding payout failures</div>
-            <div className="text-xs text-[color:var(--text-tertiary)] mt-1">Every attempted payout has been paid, resolved, or refunded.</div>
+            <div className="font-semibold text-[color:var(--text-primary)] mt-3">No outstanding payout exceptions</div>
+            <div className="text-xs text-[color:var(--text-tertiary)] mt-1">No failed or stuck payouts need attention.</div>
           </div>
         )}
 
         {!loading && items.map((a) => {
           const insufficient = isInsufficient(a);
+          const stuck = isStuck(a);
+          const warning = stuck || insufficient;
           return (
             <div key={a.id} className="card-soft p-0 overflow-hidden relative" data-testid={`gpf-row-${a.id}`}>
-              <div className={`absolute inset-y-0 left-0 w-1.5 ${insufficient ? "bg-[color:var(--warning)]" : "bg-[color:var(--error)]"}`} />
+              <div className={`absolute inset-y-0 left-0 w-1.5 ${warning ? "bg-[color:var(--warning)]" : "bg-[color:var(--error)]"}`} />
               <div className="pl-5 pr-4 py-4 flex items-start gap-3">
-                <div className={`w-11 h-11 rounded-2xl flex items-center justify-center shrink-0 ${insufficient ? "bg-[color:var(--gold-soft)] text-[color:var(--warning)]" : "bg-[color:var(--error-soft)] text-[color:var(--error)]"}`}>
-                  {insufficient ? <Wallet className="w-5 h-5" /> : <Banknote className="w-5 h-5" />}
+                <div className={`w-11 h-11 rounded-2xl flex items-center justify-center shrink-0 ${warning ? "bg-[color:var(--gold-soft)] text-[color:var(--warning)]" : "bg-[color:var(--error-soft)] text-[color:var(--error)]"}`}>
+                  {stuck ? <Clock className="w-5 h-5" /> : insufficient ? <Wallet className="w-5 h-5" /> : <Banknote className="w-5 h-5" />}
                 </div>
 
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2 flex-wrap">
                     <span className="font-semibold text-sm text-[color:var(--text-primary)]">
-                      {insufficient ? "Insufficient gateway balance" : "Gateway payout failed"}
+                      {stuck ? "Payout stuck in processing" : insufficient ? "Insufficient gateway balance" : "Gateway payout failed"}
                     </span>
                     {a.gateway && (
                       <span className="inline-flex items-center px-1.5 py-0.5 rounded-md text-[9px] font-bold uppercase tracking-wider bg-[color:var(--brand-soft)] text-[color:var(--brand)]">

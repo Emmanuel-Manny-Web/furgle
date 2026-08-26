@@ -91,6 +91,7 @@ const DEFAULT_SETTINGS = {
   fixie_proxy_url: "",
   lumenhub_proxy_url: "",
   lumenhub_base_url: "",
+  payout_stuck_minutes: 60,
 };
 
 async function getAllSettings() {

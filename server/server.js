@@ -7,7 +7,7 @@ const { init, db } = require("./db");
 const { seed } = require("./seed");
 const routes = require("./routes");
 const { processDuePayouts } = require("./payouts");
-const { pollAll } = require("./polling");
+const { pollAll, checkStuckPayouts } = require("./polling");
 const { consumeProxyRequests } = require("./proxy");
 
 const app = express();
@@ -90,6 +90,11 @@ async function main() {
   setInterval(() => {
     pollAll().catch((err) => console.error("Auto-poll error:", err.message));
   }, POLL_INTERVAL);
+
+  // Flag payouts stuck in "processing" (e.g. webhook-only gateways) every 5 min.
+  setInterval(() => {
+    checkStuckPayouts().catch((err) => console.error("Stuck-payout check error:", err.message));
+  }, 5 * 60 * 1000);
 
   // Flush the in-memory Fixie proxy request counter to settings every minute so
   // the admin dashboard's usage meter tracks every outbound gateway request

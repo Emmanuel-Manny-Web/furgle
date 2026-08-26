@@ -355,4 +355,59 @@ async function pollAll() {
   return { deposits, withdrawals };
 }
 
-module.exports = { pollDeposits, pollWithdrawals, pollUser, pollAll, refreshDepositStatus, refreshWithdrawalStatus };
+// ---------- Stuck payout watchdog ----------
+function toUtcStamp(date) {
+  const p = (n) => String(n).padStart(2, "0");
+  return `${date.getUTCFullYear()}-${p(date.getUTCMonth() + 1)}-${p(date.getUTCDate())} ${p(date.getUTCHours())}:${p(date.getUTCMinutes())}:${p(date.getUTCSeconds())}`;
+}
+
+function elapsedMinutes(stamp) {
+  const t = Date.parse(String(stamp || "").replace(" ", "T") + "Z");
+  if (!Number.isFinite(t)) return null;
+  return Math.max(0, Math.round((Date.now() - t) / 60000));
+}
+
+// Flag withdrawals stuck in "processing" beyond the configured threshold with a
+// detailed admin alert (mirrors gateway_payout_failed). Webhook-only gateways
+// (e.g. Nekpay) have no status-query API, so a payout can sit in "processing"
+// indefinitely if the async notification never arrives — this surfaces those
+// for manual review.
+async function checkStuckPayouts() {
+  const threshold = Math.max(5, Number(await getSetting("payout_stuck_minutes", "60")) || 60);
+  const cutoff = toUtcStamp(new Date(Date.now() - threshold * 60 * 1000));
+  const rows = await db.all(
+    `SELECT * FROM withdrawals
+     WHERE status = 'processing' AND updated_at <= ?
+     ORDER BY updated_at ASC LIMIT 100`,
+    cutoff
+  );
+
+  let flagged = 0;
+  for (const w of rows) {
+    const existing = await db.get(
+      "SELECT id FROM admin_alerts WHERE withdrawal_id = ? AND type = 'payout_stuck' AND resolved_at IS NULL",
+      w.id
+    );
+    if (existing) continue;
+
+    const gw = w.gateway || w.method || "gateway";
+    const mins = elapsedMinutes(w.updated_at);
+    const message =
+      `Withdrawal ${w.reference} has been stuck in "processing" for ${mins == null ? "a while" : mins + " min"} ` +
+      `(gateway: ${gw}${w.gateway_reference ? ", gateway ref " + w.gateway_reference : ""}). ` +
+      `Destination: ${w.bank_name || "unknown bank"} · ${w.account_number || "n/a"} · ${w.account_name || "n/a"} · ₦${Number(w.net_amount || w.amount || 0).toFixed(2)}. ` +
+      (gw === "nekpay"
+        ? "Nekpay has no status-query API, so the result only arrives via its async webhook — verify on the Nekpay dashboard and resolve manually."
+        : "Verify on the gateway dashboard and resolve manually.");
+
+    const id = "alert_" + uuidv4().replace(/-/g, "").slice(0, 16);
+    await db.run(
+      "INSERT INTO admin_alerts (id, type, message, withdrawal_id, gateway, severity) VALUES (?, 'payout_stuck', ?, ?, ?, 'warning')",
+      id, message, w.id, w.gateway || w.method || null
+    );
+    flagged++;
+  }
+  return { flagged };
+}
+
+module.exports = { pollDeposits, pollWithdrawals, pollUser, pollAll, checkStuckPayouts, refreshDepositStatus, refreshWithdrawalStatus };
