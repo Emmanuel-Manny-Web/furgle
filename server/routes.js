@@ -220,7 +220,7 @@ router.post("/auth/login", async (req, res) => {
   if (!phone || !password) return res.status(400).json({ detail: "Phone and password required" });
   const user = await db.get("SELECT * FROM users WHERE phone = ?", phone);
   if (!user) return res.status(401).json({ detail: "Invalid credentials" });
-  if (!bcrypt.compareSync(password, user.password_hash)) return res.status(401).json({ detail: "Invalid credentials" });
+  if (!(await bcrypt.compare(password, user.password_hash))) return res.status(401).json({ detail: "Invalid credentials" });
   if (user.is_blocked) return res.status(403).json({ detail: "Account blocked" });
   res.json({ token: await generateToken(user), user: publicUser(user) });
 });
@@ -244,10 +244,14 @@ router.post("/auth/register", async (req, res) => {
   }
   const id = "u_" + uuidv4().replace(/-/g, "").slice(0, 16);
   const code = await uniqueCode();
-  const hash = bcrypt.hashSync(password, 10);
+  const [hash, ans1, ans2] = await Promise.all([
+    bcrypt.hash(password, 10),
+    answer_1 ? bcrypt.hash(answer_1, 10) : Promise.resolve(null),
+    answer_2 ? bcrypt.hash(answer_2, 10) : Promise.resolve(null),
+  ]);
   await db.run("INSERT INTO users (id, phone, name, password_hash, referral_code, referred_by, wallet_balance, security_question_1, security_answer_1_hash, security_question_2, security_answer_2_hash) VALUES (?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?)", id, phone, name || "", hash, code, referredBy,
-    question_1 || null, answer_1 ? bcrypt.hashSync(answer_1, 10) : null,
-    question_2 || null, answer_2 ? bcrypt.hashSync(answer_2, 10) : null);
+    question_1 || null, ans1,
+    question_2 || null, ans2);
 
   // Welcome bonus
   const welcomeBonus = Number(await getAllSettings().welcome_bonus ?? 1000);
@@ -274,10 +278,10 @@ router.get("/auth/me", authMiddleware, async (req, res) => {
 
 router.post("/auth/change-password", authMiddleware, async (req, res) => {
   const { current_password, new_password } = req.body || {};
-  if (!bcrypt.compareSync(current_password || "", req.user.password_hash)) {
+  if (!(await bcrypt.compare(current_password || "", req.user.password_hash))) {
     return res.status(400).json({ detail: "Current password incorrect" });
   }
-  await db.run("UPDATE users SET password_hash = ? WHERE id = ?", bcrypt.hashSync(new_password, 10), req.user.id);
+  await db.run("UPDATE users SET password_hash = ? WHERE id = ?", await bcrypt.hash(new_password, 10), req.user.id);
   res.json({ message: "Password changed" });
 });
 
@@ -295,7 +299,7 @@ router.post("/auth/forgot-password", async (req, res) => {
     return res.status(400).json({ detail: "New password must be at least 6 characters" });
   }
   await db.run(`INSERT INTO password_resets (id, user_id, reason, new_password_hash, status)
-     VALUES (?, ?, ?, ?, 'pending')`, "pr_" + uuidv4().replace(/-/g, "").slice(0, 16), user.id, String(reason || ""), bcrypt.hashSync(String(new_password), 10));
+     VALUES (?, ?, ?, ?, 'pending')`, "pr_" + uuidv4().replace(/-/g, "").slice(0, 16), user.id, String(reason || ""), await bcrypt.hash(String(new_password), 10));
   res.json({ message: "Password reset request submitted for admin review" });
 });
 
@@ -310,12 +314,12 @@ router.post("/auth/reset-with-questions", async (req, res) => {
     return res.status(400).json({ detail: "New password must be at least 6 characters" });
   }
   if (
-    !bcrypt.compareSync(answer_1 || "", user.security_answer_1_hash) ||
-    !bcrypt.compareSync(answer_2 || "", user.security_answer_2_hash)
+    !(await bcrypt.compare(answer_1 || "", user.security_answer_1_hash)) ||
+    !(await bcrypt.compare(answer_2 || "", user.security_answer_2_hash))
   ) {
     return res.status(400).json({ detail: "Incorrect answers" });
   }
-  await db.run("UPDATE users SET password_hash = ? WHERE id = ?", bcrypt.hashSync(String(new_password), 10), user.id);
+  await db.run("UPDATE users SET password_hash = ? WHERE id = ?", await bcrypt.hash(String(new_password), 10), user.id);
   res.json({ message: "Password reset" });
 });
 
@@ -1189,7 +1193,7 @@ router.post("/withdrawal/request", authMiddleware, async (req, res) => {
     if (!req.user.has_withdrawal_pin || !req.user.withdrawal_pin_hash) {
       return res.status(400).json({ detail: "Set a withdrawal PIN in your profile first" });
     }
-    if (!pin || !bcrypt.compareSync(String(pin), req.user.withdrawal_pin_hash)) {
+    if (!pin || !(await bcrypt.compare(String(pin), req.user.withdrawal_pin_hash))) {
       return res.status(400).json({ detail: "Incorrect withdrawal PIN" });
     }
   }
@@ -1558,7 +1562,7 @@ router.post("/profile/security-questions/set", authMiddleware, async (req, res) 
   if (!question_1 || !answer_1 || !question_2 || !answer_2) {
     return res.status(400).json({ detail: "All questions and answers are required" });
   }
-  await db.run("UPDATE users SET security_question_1 = ?, security_answer_1_hash = ?, security_question_2 = ?, security_answer_2_hash = ? WHERE id = ?", question_1, bcrypt.hashSync(answer_1, 10), question_2, bcrypt.hashSync(answer_2, 10), req.user.id);
+  await db.run("UPDATE users SET security_question_1 = ?, security_answer_1_hash = ?, security_question_2 = ?, security_answer_2_hash = ? WHERE id = ?", question_1, await bcrypt.hash(answer_1, 10), question_2, await bcrypt.hash(answer_2, 10), req.user.id);
   res.json({ message: "Security questions updated" });
 });
 
@@ -1575,26 +1579,31 @@ router.put("/profile/bank", authMiddleware, async (req, res) => {
 router.post("/profile/withdrawal-pin/set", authMiddleware, async (req, res) => {
   const { pin, question_1, answer_1, question_2, answer_2 } = req.body || {};
   if (!pin || pin.length !== 4) return res.status(400).json({ detail: "PIN must be 4 digits" });
-  await db.run("UPDATE users SET has_withdrawal_pin = 1, withdrawal_pin_hash = ?, security_question_1 = ?, security_answer_1_hash = ?, security_question_2 = ?, security_answer_2_hash = ? WHERE id = ?", bcrypt.hashSync(pin, 10), question_1 || null, answer_1 ? bcrypt.hashSync(answer_1, 10) : null,
-    question_2 || null, answer_2 ? bcrypt.hashSync(answer_2, 10) : null, req.user.id);
+  const [pinHash, ans1, ans2] = await Promise.all([
+    bcrypt.hash(pin, 10),
+    answer_1 ? bcrypt.hash(answer_1, 10) : Promise.resolve(null),
+    answer_2 ? bcrypt.hash(answer_2, 10) : Promise.resolve(null),
+  ]);
+  await db.run("UPDATE users SET has_withdrawal_pin = 1, withdrawal_pin_hash = ?, security_question_1 = ?, security_answer_1_hash = ?, security_question_2 = ?, security_answer_2_hash = ? WHERE id = ?", pinHash, question_1 || null, ans1,
+    question_2 || null, ans2, req.user.id);
   res.json({ message: "PIN set" });
 });
 
 router.post("/profile/withdrawal-pin/change", authMiddleware, async (req, res) => {
   const { old_pin, new_pin } = req.body || {};
-  if (!req.user.withdrawal_pin_hash || !bcrypt.compareSync(old_pin || "", req.user.withdrawal_pin_hash)) {
+  if (!req.user.withdrawal_pin_hash || !(await bcrypt.compare(old_pin || "", req.user.withdrawal_pin_hash))) {
     return res.status(400).json({ detail: "Incorrect current PIN" });
   }
-  await db.run("UPDATE users SET withdrawal_pin_hash = ? WHERE id = ?", bcrypt.hashSync(new_pin, 10), req.user.id);
+  await db.run("UPDATE users SET withdrawal_pin_hash = ? WHERE id = ?", await bcrypt.hash(new_pin, 10), req.user.id);
   res.json({ message: "PIN changed" });
 });
 
 router.post("/profile/withdrawal-pin/reset", authMiddleware, async (req, res) => {
   const { answer_1, answer_2, new_pin } = req.body || {};
-  if (req.user.security_answer_1_hash && !bcrypt.compareSync(answer_1 || "", req.user.security_answer_1_hash)) {
+  if (req.user.security_answer_1_hash && !(await bcrypt.compare(answer_1 || "", req.user.security_answer_1_hash))) {
     return res.status(400).json({ detail: "Incorrect answer" });
   }
-  await db.run("UPDATE users SET withdrawal_pin_hash = ? WHERE id = ?", bcrypt.hashSync(new_pin, 10), req.user.id);
+  await db.run("UPDATE users SET withdrawal_pin_hash = ? WHERE id = ?", await bcrypt.hash(new_pin, 10), req.user.id);
   res.json({ message: "PIN reset" });
 });
 
@@ -1935,7 +1944,7 @@ router.post("/admin/users/:id/reset-password", async (req, res) => {
   if (!u) return res.status(404).json({ detail: "Not found" });
   const { new_password } = req.body || {};
   if (!new_password || String(new_password).length < 6) return res.status(400).json({ detail: "Password must be at least 6 characters" });
-  await db.run("UPDATE users SET password_hash = ? WHERE id = ?", bcrypt.hashSync(String(new_password), 10), u.id);
+  await db.run("UPDATE users SET password_hash = ? WHERE id = ?", await bcrypt.hash(String(new_password), 10), u.id);
   await logActivity(req.user, "user.password_reset", "user", u.id, `Reset password for ${u.phone}`);
   res.json({ message: "Password reset" });
 });
@@ -2767,10 +2776,10 @@ router.get("/admin/banks", async (req, res) => {
 
 router.post("/admin/change-password", async (req, res) => {
   const { current_password, new_password } = req.body || {};
-  if (!bcrypt.compareSync(current_password || "", req.user.password_hash)) {
+  if (!(await bcrypt.compare(current_password || "", req.user.password_hash))) {
     return res.status(400).json({ detail: "Current password incorrect" });
   }
-  await db.run("UPDATE users SET password_hash = ? WHERE id = ?", bcrypt.hashSync(new_password, 10), req.user.id);
+  await db.run("UPDATE users SET password_hash = ? WHERE id = ?", await bcrypt.hash(new_password, 10), req.user.id);
   res.json({ message: "Password changed" });
 });
 

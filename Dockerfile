@@ -21,6 +21,7 @@ RUN yarn build
 # ---- Stage 3: runtime (Node server) ----
 FROM node:20-alpine
 ENV NODE_ENV=production
+ENV UV_THREADPOOL_SIZE=8
 WORKDIR /app
 
 # Backend source + production dependencies

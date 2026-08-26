@@ -1,3 +1,8 @@
+// Increase libuv's thread pool before anything else is required, so file
+// serving (uploads/static), DNS lookups for outbound gateway calls, and any
+// native crypto can run concurrently during peak load.
+process.env.UV_THREADPOOL_SIZE = process.env.UV_THREADPOOL_SIZE || "8";
+
 require("./env");
 
 const express = require("express");

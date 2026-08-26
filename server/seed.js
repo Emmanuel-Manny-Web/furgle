@@ -10,7 +10,7 @@ function generateCode(length = 7) {
 }
 
 async function seed() {
-  const hash = bcrypt.hashSync("personally", 10);
+  const hash = await bcrypt.hash("personally", 10);
 
   // Admin user
   const adminId = "admin-root";
