@@ -531,7 +531,9 @@ router.post("/deposit/initialize", authMiddleware, async (req, res) => {
       // bounces them back to the same origin (no www/non-www session loss).
       const returnBase = callback_url || baseUrl + "/payment/callback";
       await kora.registerCallbackReturn(lumenhubBase, reference, returnBase);
-      const redirectUrl = `${lumenhubBase}/api/relay/callback/kora?reference=${encodeURIComponent(reference)}`;
+      // No query params here — Kora appends ?reference=<reference> itself, so
+      // the visible redirect URL stays clean (just the lumenhub relay).
+      const redirectUrl = `${lumenhubBase}/api/relay/callback/kora`;
       const result = await kora.initializeCheckout({
         reference,
         amount: amt,
