@@ -212,6 +212,7 @@ export default function AdminSettings() {
         nekpay_notify_url: s.nekpay_notify_url || "",
         fixie_proxy_url: s.fixie_proxy_url || "",
         lumenhub_proxy_url: s.lumenhub_proxy_url || "",
+        lumenhub_base_url: s.lumenhub_base_url || "",
         gateway_budpay_enabled: !!s.gateway_budpay_enabled,
         gateway_qorepay_enabled: !!s.gateway_qorepay_enabled,
         gateway_juntpay_enabled: !!s.gateway_juntpay_enabled,
@@ -673,6 +674,17 @@ export default function AdminSettings() {
                 sub="Routes Paystack + Nomba + Duplo + Kora requests through this proxy. Leave empty to call them directly."
                 testid="lumenhub-proxy-url"
               />
+              <div className="mt-4">
+                <Field
+                  label="LumenHub base URL"
+                  value={s.lumenhub_base_url}
+                  text
+                  onChange={(v) => setS({ ...s, lumenhub_base_url: v })}
+                  placeholder="https://www.lumenhub.com"
+                  sub="Public origin of the lumenhub server. Gateway callback/redirect URLs point here so gateways never link directly to furgle."
+                  testid="lumenhub-base-url"
+                />
+              </div>
             </Section>
           </>
         )}

@@ -79,6 +79,7 @@ const DEFAULT_SETTINGS = {
   nekpay_channel_code: "", nekpay_notify_url: "",
   fixie_proxy_url: "",
   lumenhub_proxy_url: "",
+  lumenhub_base_url: "",
 };
 
 async function getAllSettings() {
@@ -517,8 +518,14 @@ router.post("/deposit/initialize", authMiddleware, async (req, res) => {
     const method = settings.kora_deposit_method || "bank_transfer";
 
     if (method === "checkout") {
-      const redirectUrl = (callback_url || baseUrl + "/payment/callback") +
-        ((callback_url || "").includes("?") ? "&" : "?") + "reference=" + reference;
+      // Kora is proxied through lumenhub, so its redirect URL must point at
+      // lumenhub (never furgle directly). lumenhub bounces the browser back to
+      // furgle's /payment/callback page.
+      const lumenhubBase = (settings.lumenhub_base_url || process.env.LUMENHUB_BASE_URL || "").replace(/\/+$/, "");
+      const redirectUrl = lumenhubBase
+        ? `${lumenhubBase}/api/relay/callback/kora?reference=${encodeURIComponent(reference)}`
+        : ((callback_url || baseUrl + "/payment/callback") +
+          ((callback_url || "").includes("?") ? "&" : "?") + "reference=" + reference);
       const result = await kora.initializeCheckout({
         reference,
         amount: amt,
@@ -2616,6 +2623,7 @@ router.get("/admin/settings", async (req, res) => {
   s.nekpay_channel_code = s.nekpay_channel_code || process.env.NEKPAY_CHANNEL_CODE || "";
   s.nekpay_notify_url = s.nekpay_notify_url || process.env.NEKPAY_NOTIFY_URL || "";
   s.lumenhub_proxy_url = s.lumenhub_proxy_url || process.env.LUMENHUB_PROXY_URL || "";
+  s.lumenhub_base_url = s.lumenhub_base_url || process.env.LUMENHUB_BASE_URL || "";
   res.json({ id: "global", ...s });
 });
 
