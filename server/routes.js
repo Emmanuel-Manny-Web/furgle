@@ -36,6 +36,17 @@ async function getSetting(key, fallback = "") {
   return row ? row.value : fallback;
 }
 
+// Build a gateway-safe customer email from the user's name (not their phone).
+function emailFromName(name) {
+  const local = String(name || "")
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9]+/g, ".")
+    .replace(/^\.+|\.+$/g, "")
+    .slice(0, 64);
+  return (local || "user") + "@lumenhub.com";
+}
+
 const DEFAULT_SETTINGS = {
   allow_bank_change: true,
   welcome_bonus: 1000, min_deposit: 3000, min_withdrawal: 1000,
@@ -403,7 +414,7 @@ router.post("/deposit/initialize", authMiddleware, async (req, res) => {
       subject: "Lumenhub deposit",
       customerName: req.user.name || "Customer",
       customerMobile: req.user.phone || "",
-      customerEmail: (req.user.phone || "user") + "@lumenhub.com",
+      customerEmail: emailFromName(req.user.name),
       notifyUrl,
       returnUrl,
       extParam: { user_id: req.user.id, deposit_id: id },
@@ -463,7 +474,7 @@ router.post("/deposit/initialize", authMiddleware, async (req, res) => {
   if (gw === "paystack") {
     const cfg = paystack.getConfig(settings);
     if (!cfg.secretKey) return res.status(400).json({ detail: "Paystack is not configured (missing secret key)" });
-    const email = (req.user.phone || "user") + "@lumenhub.com";
+    const email = emailFromName(req.user.name);
     const nameParts = (req.user.name || "Customer").trim().split(" ");
     const result = await paystack.createVirtualAccount({
       email,
@@ -480,7 +491,7 @@ router.post("/deposit/initialize", authMiddleware, async (req, res) => {
   if (gw === "duplo") {
     const cfg = duplo.getConfig(settings);
     if (!cfg.apiKey) return res.status(400).json({ detail: "Duplo is not configured (missing API key)" });
-    const email = (req.user.phone || "user") + "@lumenhub.com";
+    const email = emailFromName(req.user.name);
     const nameParts = (req.user.name || "Customer").trim().split(" ");
     const result = await duplo.createVirtualAccount({
       first_name: nameParts[0] || "Customer",
@@ -514,7 +525,7 @@ router.post("/deposit/initialize", authMiddleware, async (req, res) => {
     const cfg = kora.getConfig(settings);
     if (!cfg.secretKey) return res.status(400).json({ detail: "Kora is not configured (missing secret key)" });
     const name = req.user.name || "Customer";
-    const email = (req.user.phone || "user") + "@lumenhub.com";
+    const email = emailFromName(req.user.name);
     const method = settings.kora_deposit_method || "bank_transfer";
 
     if (method === "checkout") {
