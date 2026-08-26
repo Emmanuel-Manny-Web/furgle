@@ -1,7 +1,46 @@
 const https = require("https");
+const http = require("http");
 const { getProxyAgent } = require("./proxy");
 
 const BASE = "https://api.korapay.com/merchant/api/v1";
+
+// Tell the lumenhub relay where to bounce a checkout callback for a given
+// reference, so the return origin never appears in the visible redirect URL.
+// This is a direct server-to-server call (no proxy). Best-effort — failures
+// fall back to lumenhub's configured FURGLE_WEBHOOK_BASE_URL.
+function registerCallbackReturn(lumenhubBase, reference, to) {
+  return new Promise((resolve) => {
+    try {
+      const base = String(lumenhubBase || "").replace(/\/+$/, "");
+      if (!base) return resolve(false);
+      const url = new URL(base + "/api/relay/register-callback");
+      const mod = url.protocol === "https:" ? https : http;
+      const payload = JSON.stringify({ reference, to });
+      const req = mod.request(
+        {
+          hostname: url.hostname,
+          port: url.port || (url.protocol === "https:" ? 443 : 80),
+          path: url.pathname + url.search,
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Content-Length": Buffer.byteLength(payload),
+          },
+        },
+        (res) => {
+          res.resume();
+          res.on("end", () => resolve(true));
+        }
+      );
+      req.on("error", () => resolve(false));
+      req.setTimeout(5000, () => { req.destroy(); resolve(false); });
+      req.write(payload);
+      req.end();
+    } catch {
+      resolve(false);
+    }
+  });
+}
 
 function getConfig(settings) {
   const s = settings || {};
@@ -248,6 +287,7 @@ async function queryBalance(cfg) {
 
 module.exports = {
   getConfig, createVirtualAccount, createPermanentVirtualAccount, initializeCheckout,
+  registerCallbackReturn,
   verifyCharge, isVirtualAccountPaid, listBanks, resolveAccount,
   createPayout, verifyPayout, queryBalance,
 };
