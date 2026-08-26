@@ -520,12 +520,13 @@ router.post("/deposit/initialize", authMiddleware, async (req, res) => {
     if (method === "checkout") {
       // Kora is proxied through lumenhub, so its redirect URL must point at
       // lumenhub (never furgle directly). lumenhub bounces the browser back to
-      // furgle's /payment/callback page.
+      // furgle's /payment/callback page. There is intentionally no fallback to
+      // furgle here — if lumenhub is not configured, fail loudly.
       const lumenhubBase = (settings.lumenhub_base_url || process.env.LUMENHUB_BASE_URL || "").replace(/\/+$/, "");
-      const redirectUrl = lumenhubBase
-        ? `${lumenhubBase}/api/relay/callback/kora?reference=${encodeURIComponent(reference)}`
-        : ((callback_url || baseUrl + "/payment/callback") +
-          ((callback_url || "").includes("?") ? "&" : "?") + "reference=" + reference);
+      if (!lumenhubBase) {
+        return res.status(400).json({ detail: "Kora checkout requires the LumenHub base URL (set LUMENHUB_BASE_URL or lumenhub_base_url in settings)" });
+      }
+      const redirectUrl = `${lumenhubBase}/api/relay/callback/kora?reference=${encodeURIComponent(reference)}`;
       const result = await kora.initializeCheckout({
         reference,
         amount: amt,
