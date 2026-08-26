@@ -837,6 +837,51 @@ router.post("/deposit/webhook/nomba", async (req, res) => {
   res.status(200).send("OK");
 });
 
+// Kora webhook — handles charge.success/charge.failed (deposits) and
+// transfer.success/transfer.failed (payouts). The request is signed with an
+// HMAC SHA256 of the `data` object using the secret key (x-korapay-signature).
+router.post("/deposit/webhook/kora", async (req, res) => {
+  const body = req.body || {};
+  const event = String(body.event || "");
+  const data = body.data || {};
+
+  const cfg = kora.getConfig(await getAllSettings());
+  if (cfg.secretKey) {
+    const sig = String(req.headers["x-korapay-signature"] || "");
+    const expected = crypto.createHmac("sha256", cfg.secretKey).update(JSON.stringify(data)).digest("hex");
+    if (!sig || sig !== expected) {
+      return res.status(401).send("INVALID_SIGNATURE");
+    }
+  }
+
+  if (event === "charge.success" || event === "charge.failed") {
+    const reference = data.reference || data.payment_reference || "";
+    const dep = reference ? await db.get("SELECT * FROM deposits WHERE reference = ? OR gateway_id = ?", reference, reference) : null;
+    if (dep) {
+      if (event === "charge.success" && dep.status !== "success") {
+        await db.run("UPDATE deposits SET status = 'success', updated_at = to_char(now() AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI:SS') WHERE id = ?", dep.id);
+        await addTransaction(dep.user_id, "deposit", dep.amount, "Deposit", { reference: dep.reference, gateway: "kora" });
+        await creditDepositBonus(dep.user_id, dep.amount, dep.reference);
+      } else if (event === "charge.failed") {
+        await db.run("UPDATE deposits SET status = 'failed', updated_at = to_char(now() AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI:SS') WHERE id = ?", dep.id);
+      }
+    }
+  } else if (event === "transfer.success" || event === "transfer.failed") {
+    const reference = data.reference || "";
+    const wd = reference ? await db.get("SELECT * FROM withdrawals WHERE reference = ? OR gateway_reference = ?", reference, reference) : null;
+    if (wd) {
+      if (event === "transfer.success") {
+        await db.run("UPDATE withdrawals SET status = 'success', updated_at = to_char(now() AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI:SS'), processed_at = to_char(now() AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI:SS') WHERE id = ?", wd.id);
+      } else if (wd.status !== "rejected") {
+        await db.run("UPDATE withdrawals SET status = 'rejected', failure_reason = ?, updated_at = to_char(now() AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI:SS') WHERE id = ?", "Kora transfer failed", wd.id);
+        await addTransaction(wd.user_id, "refund", wd.amount, "Payout failed", { withdrawal_id: wd.id });
+      }
+    }
+  }
+
+  res.status(200).send("OK");
+});
+
 // ---------- WITHDRAWALS ----------
 // True when a gateway error indicates the merchant float has no funds.
 function isInsufficientBalanceError(error) {

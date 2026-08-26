@@ -49,10 +49,13 @@ function request(method, path, body, cfg, authKey) {
 }
 
 // Create a single-use virtual account for a bank-transfer deposit.
+// Endpoint: POST /charges/bank-transfer (requires account_name, amount,
+// currency, reference and customer.name/email).
 async function createVirtualAccount({ reference, amount, name, email, phone }, cfg) {
   try {
     const fullName = (name || "Customer").trim() || "Customer";
     const r = await request("POST", "/charges/bank-transfer", {
+      account_name: fullName,
       reference,
       amount: Number(amount),
       currency: "NGN",
@@ -66,7 +69,7 @@ async function createVirtualAccount({ reference, amount, name, email, phone }, c
     const ba = d.bank_account || {};
     return {
       data: {
-        account_reference: d.reference || reference,
+        account_reference: d.reference || d.payment_reference || reference,
         account_number: ba.account_number || d.account_number || null,
         account_name: ba.account_name || d.account_name || null,
         bank_name: ba.bank_name || "Kora",
