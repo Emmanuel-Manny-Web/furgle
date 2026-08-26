@@ -526,7 +526,11 @@ router.post("/deposit/initialize", authMiddleware, async (req, res) => {
       if (!lumenhubBase) {
         return res.status(400).json({ detail: "Kora checkout requires the LumenHub base URL (set LUMENHUB_BASE_URL or lumenhub_base_url in settings)" });
       }
-      const redirectUrl = `${lumenhubBase}/api/relay/callback/kora?reference=${encodeURIComponent(reference)}`;
+      // `to` is the exact origin the customer should land back on, so lumenhub
+      // can redirect them to the same origin they started from (keeps their
+      // session cookie/localStorage intact and avoids any www/non-www mismatch).
+      const returnBase = callback_url || baseUrl + "/payment/callback";
+      const redirectUrl = `${lumenhubBase}/api/relay/callback/kora?reference=${encodeURIComponent(reference)}&to=${encodeURIComponent(returnBase)}`;
       const result = await kora.initializeCheckout({
         reference,
         amount: amt,
