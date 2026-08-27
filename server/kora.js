@@ -111,13 +111,23 @@ async function createVirtualAccount({ reference, amount, name, email, phone }, c
         account_reference: d.reference || d.payment_reference || reference,
         account_number: ba.account_number || d.account_number || null,
         account_name: ba.account_name || d.account_name || null,
-        bank_name: ba.bank_name || "Kora",
+        bank_name: prettyBankName(ba.bank_name || "Kora"),
         bank_code: ba.bank_code || null,
+        expires_at: ba.expiry_date_in_utc || null,
       },
     };
   } catch (err) {
     return { error: err.message };
   }
+}
+
+// Capitalize a bank name so "wema" -> "Wema", "gtb" -> "Gtb", etc.
+function prettyBankName(name) {
+  return String(name || "")
+    .split(" ")
+    .filter(Boolean)
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
+    .join(" ");
 }
 
 // Create a permanent/fixed virtual bank account for a customer.

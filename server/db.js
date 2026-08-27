@@ -334,6 +334,9 @@ async function init() {
   await pool.query("CREATE INDEX IF NOT EXISTS idx_deposits_status ON deposits(status)");
   await pool.query("CREATE INDEX IF NOT EXISTS idx_withdrawals_status ON withdrawals(status)");
 
+  // Migrations for columns added after the initial schema.
+  await pool.query("ALTER TABLE deposits ADD COLUMN IF NOT EXISTS expires_at TEXT");
+
   return db;
 }
 

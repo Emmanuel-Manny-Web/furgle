@@ -496,16 +496,36 @@ router.post("/deposit/initialize", authMiddleware, async (req, res) => {
   if (gw === "duplo") {
     const cfg = duplo.getConfig(settings);
     if (!cfg.apiKey) return res.status(400).json({ detail: "Duplo is not configured (missing API key)" });
-    const email = emailFromName(req.user.name);
-    const nameParts = (req.user.name || "Customer").trim().split(" ");
-    const result = await duplo.createVirtualAccount({
-      first_name: nameParts[0] || "Customer",
-      last_name: nameParts.slice(1).join(" ") || "Deposit",
-      email,
-      phone: req.user.phone || "",
-    }, cfg);
-    if (result.error) return res.status(502).json({ detail: result.error });
-    const d = result.data;
+
+    // A Duplo customer can only have one dedicated virtual account. Reuse the
+    // account from the user's most recent Duplo deposit instead of trying to
+    // create a new customer (which errors for existing customers).
+    const prev = await db.get(
+      "SELECT gateway_id, account_number, account_name, bank_name FROM deposits WHERE user_id = ? AND method = 'duplo' AND account_number IS NOT NULL ORDER BY created_at DESC LIMIT 1",
+      req.user.id
+    );
+
+    let d;
+    if (prev && prev.account_number) {
+      d = {
+        bank_name: prev.bank_name,
+        account_number: prev.account_number,
+        account_name: prev.account_name,
+        account_reference: prev.gateway_id || null,
+      };
+    } else {
+      const email = emailFromName(req.user.name);
+      const nameParts = (req.user.name || "Customer").trim().split(" ");
+      const result = await duplo.createVirtualAccount({
+        first_name: nameParts[0] || "Customer",
+        last_name: nameParts.slice(1).join(" ") || "Deposit",
+        email,
+        phone: req.user.phone || "",
+      }, cfg);
+      if (result.error) return res.status(502).json({ detail: result.error });
+      d = result.data;
+    }
+
     await db.run("INSERT INTO deposits (id, user_id, amount, reference, method, status, bank_name, account_number, account_name, gateway_id, virtual_account_number) VALUES (?, ?, ?, ?, 'duplo', 'pending', ?, ?, ?, ?, ?)", id, req.user.id, amt, reference, d.bank_name || null, d.account_number || null, d.account_name || null, d.account_reference || d.customer_reference || null, d.account_number || null);
     return res.status(201).json({ id, reference, amount: amt, status: "pending", type: "bank_transfer", bank_name: d.bank_name, account_number: d.account_number, account_name: d.account_name });
   }
@@ -588,8 +608,8 @@ router.post("/deposit/initialize", authMiddleware, async (req, res) => {
     }, cfg);
     if (result.error) return res.status(502).json({ detail: result.error });
     const d = result.data;
-    await db.run("INSERT INTO deposits (id, user_id, amount, reference, method, status, bank_name, account_number, account_name, gateway_id, virtual_account_number) VALUES (?, ?, ?, ?, 'kora', 'pending', ?, ?, ?, ?, ?)", id, req.user.id, amt, reference, d.bank_name || null, d.account_number || null, d.account_name || null, d.account_reference || reference, d.account_number || null);
-    return res.status(201).json({ id, reference, amount: amt, status: "pending", type: "bank_transfer", bank_name: d.bank_name, account_number: d.account_number, account_name: d.account_name });
+    await db.run("INSERT INTO deposits (id, user_id, amount, reference, method, status, bank_name, account_number, account_name, gateway_id, virtual_account_number, expires_at) VALUES (?, ?, ?, ?, 'kora', 'pending', ?, ?, ?, ?, ?, ?)", id, req.user.id, amt, reference, d.bank_name || null, d.account_number || null, d.account_name || null, d.account_reference || reference, d.account_number || null, d.expires_at || null);
+    return res.status(201).json({ id, reference, amount: amt, status: "pending", type: "bank_transfer", bank_name: d.bank_name, account_number: d.account_number, account_name: d.account_name, expires_at: d.expires_at || null });
   }
 
   const isMock = settings.payment_mode !== "live";

@@ -195,7 +195,9 @@ async function createVirtualAccount({ first_name, last_name, email, phone }, cfg
         account_number: wallet.accountNumber,
         account_name: wallet.accountName,
         account_reference: wallet.accountReference,
-        bank_name: wallet.bankName || "Wema Bank",
+        // The wallet's `provider` field holds the bank that provisioned the DVA
+        // (e.g. "Globus Bank"); there is no `bankName` field.
+        bank_name: wallet.provider || "Globus Bank",
       },
     };
   } catch (err) {
