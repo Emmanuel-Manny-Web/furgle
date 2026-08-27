@@ -382,7 +382,7 @@ svg {
 /* ---------- stat tiles ---------- */
 .stats {
   display: grid;
-  grid-template-columns: 1fr 1fr 1fr;
+  grid-template-columns: 1fr 1fr;
   gap: 10px;
 }
 .stat {
@@ -456,7 +456,7 @@ svg {
 }
 @media (min-width: 400px) {
   .quick {
-    grid-template-columns: repeat(4, 1fr);
+    grid-template-columns: repeat(2, 1fr);
   }
 }
 .quick .q {

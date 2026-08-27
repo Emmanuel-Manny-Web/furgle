@@ -103,11 +103,6 @@ export default function Dashboard() {
 
       {/* Stats */}
       <div className="stats">
-        <Link to="/history" className="stat" style={{ display: "block" }}>
-          <div className="ic accent"><Icon.Spark /></div>
-          <div className="v">{money(user?.total_earnings, { compact: true })}</div>
-          <div className="l">Total earned</div>
-        </Link>
         <Link to="/my-packages" className="stat" style={{ display: "block" }}>
           <div className="ic brand"><Icon.Package /></div>
           <div className="v">{activeCount}</div>
