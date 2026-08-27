@@ -61,10 +61,8 @@ export default function Dashboard() {
   const plansCount = Number(settings?.home_plans_count ?? 0);
 
   const quick = [
-    { to: "/my-packages", label: "My Packages", icon: <Icon.Package />, tone: "brand" },
-    { to: "/invest", label: "Invest", icon: <Icon.Invest />, tone: "gold" },
     { to: "/history", label: "History", icon: <Icon.History />, tone: "accent" },
-    { to: "/referrals", label: "Refer", icon: <Icon.Team />, tone: "brand" },
+    { to: "/coupons", label: "Coupon", icon: <Icon.Gift />, tone: "brand" },
   ];
 
   return (
@@ -105,11 +103,11 @@ export default function Dashboard() {
 
       {/* Stats */}
       <div className="stats">
-        <div className="stat">
+        <Link to="/history" className="stat" style={{ display: "block" }}>
           <div className="ic accent"><Icon.Spark /></div>
           <div className="v">{money(user?.total_earnings, { compact: true })}</div>
           <div className="l">Total earned</div>
-        </div>
+        </Link>
         <Link to="/my-packages" className="stat" style={{ display: "block" }}>
           <div className="ic brand"><Icon.Package /></div>
           <div className="v">{activeCount}</div>

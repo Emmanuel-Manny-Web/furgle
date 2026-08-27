@@ -175,7 +175,7 @@ export default function Dashboard() {
   const otherPlans = products.filter((p) => !featured || p.id !== featured.id);
 
   const stats = [
-    { icon: Coins, label: "Total earned", value: formatNaira(user?.total_earnings || 0, { compact: true }), tone: "accent", testid: "stat-earnings" },
+    { icon: Coins, label: "Total earned", value: formatNaira(user?.total_earnings || 0, { compact: true }), tone: "accent", testid: "stat-earnings", to: "/history" },
     { icon: Briefcase, label: "Active plans", value: String(activeCount), tone: "brand", testid: "stat-packages", to: "/my-packages" },
     { icon: Users, label: "Referral bonus", value: formatNaira(user?.referral_earnings || 0, { compact: true }), tone: "gold", testid: "stat-referral", to: "/team" },
   ];
