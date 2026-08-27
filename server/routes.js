@@ -843,8 +843,11 @@ router.post("/deposit/webhook/duplo", async (req, res) => {
   const eventType = String(body.event_type || body.event || data.event_type || data.event || "").toLowerCase();
 
   if (eventType === "in_flow_success_event") {
-    // Virtual account inflow — match by account number.
-    const accountNumber = data.customerAccountNumber || data.customer_account_number || "";
+    // Virtual account inflow — match by the account that received the money.
+    // Duplo's payload has both `customerAccountNumber` (the payer) and
+    // `recipient.accountNumber` (the receiving virtual account); we match on
+    // the recipient, which is our virtual account.
+    const accountNumber = (data.recipient && data.recipient.accountNumber) || "";
     const dep = accountNumber
       ? await db.get("SELECT * FROM deposits WHERE account_number = ? AND method = 'duplo'", accountNumber)
       : null;
