@@ -166,6 +166,29 @@ function isGatewayConfigured(gw, settings) {
   return false;
 }
 
+// Canonical order of deposit gateways (used for stable "Gateway 1/2/3…" labels).
+const DEPOSIT_GATEWAYS = ["paystack", "nomba", "marasoft", "budpay", "qorepay", "juntpay", "duplo", "kora", "nekpay"];
+
+function isGatewayEnabled(gw, settings) {
+  const map = {
+    paystack: settings.gateway_paystack_enabled !== false,
+    nomba: settings.gateway_nomba_enabled !== false,
+    marasoft: settings.gateway_marasoft_enabled !== false,
+    budpay: !!settings.gateway_budpay_enabled,
+    qorepay: !!settings.gateway_qorepay_enabled,
+    juntpay: !!settings.gateway_juntpay_enabled,
+    duplo: !!settings.gateway_duplo_enabled,
+    kora: !!settings.gateway_kora_enabled,
+    nekpay: !!settings.gateway_nekpay_enabled,
+  };
+  return !!map[gw];
+}
+
+// Gateways the user can actually deposit through (enabled AND configured).
+function listAvailableDepositGateways(settings) {
+  return DEPOSIT_GATEWAYS.filter((gw) => isGatewayEnabled(gw, settings) && isGatewayConfigured(gw, settings));
+}
+
 async function logActivity(admin, action, targetType, targetId, description, meta = {}) {
   await db.run("INSERT INTO activity_log (id, admin_id, admin_phone, admin_name, action, target_type, target_id, description, meta) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)", "act_" + uuidv4().replace(/-/g, "").slice(0, 16),
     admin.id, admin.phone, admin.name, action, targetType, targetId, description, JSON.stringify(meta));
@@ -399,7 +422,7 @@ router.post("/deposit/initialize", authMiddleware, async (req, res) => {
   const minDeposit = Number(settings.min_deposit ?? 0);
   if (minDeposit > 0 && amt < minDeposit) return res.status(400).json({ detail: `Minimum deposit is ₦${minDeposit}` });
   let gw = settings.deposit_gateway || "paystack";
-  if (gateway && settings.multi_gateway_enabled && settings.let_users_choose_gateway) {
+  if (gateway && settings.multi_gateway_enabled && isGatewayEnabled(gateway, settings) && isGatewayConfigured(gateway, settings)) {
     gw = gateway;
   }
 
@@ -1703,6 +1726,8 @@ const SECRET_SETTING_KEYS = new Set([
 router.get("/settings/public", async (req, res) => {
   const s = await getAllSettings();
   for (const k of SECRET_SETTING_KEYS) s[k] = "";
+  // Which gateways users may deposit through (enabled + configured), in order.
+  s.deposit_gateways = listAvailableDepositGateways(await getAllSettings());
   res.json(s);
 });
 

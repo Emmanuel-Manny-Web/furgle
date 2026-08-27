@@ -12,10 +12,18 @@ export default function Deposit() {
   const [amount, setAmount] = useState("");
   const [busy, setBusy] = useState(false);
   const [qr, setQr] = useState(null);
+  const [gw, setGw] = useState(null);
 
   const { data: settings } = useCachedData("/settings/public", () => api("/settings/public", { auth: false }));
   const { data: deposits, reload: reloadDeposits } = useCachedData("/deposits", () => api("/deposits"));
   const depositList = deposits || [];
+  const availableGateways = settings?.deposit_gateways || [];
+
+  useEffect(() => {
+    if (availableGateways.length) {
+      setGw((prev) => (prev && availableGateways.includes(prev) ? prev : availableGateways[0]));
+    }
+  }, [availableGateways]);
 
   const poll = useCallback(async () => {
     try {
@@ -42,7 +50,10 @@ export default function Deposit() {
     setBusy(true);
     try {
       const callback = `${window.location.origin}/payment/callback`;
-      const r = await api("/deposit/initialize", { method: "POST", body: { amount: amt, callback_url: callback } });
+      const r = await api("/deposit/initialize", {
+        method: "POST",
+        body: { amount: amt, callback_url: callback, gateway: gw || undefined }
+      });
       if (r.type === "qr" && r.qr_code) {
         setQr(r.qr_code);
       } else if (r.mode === "live" && r.authorization_url) {
@@ -103,6 +114,20 @@ export default function Deposit() {
             <button key={q} type="button" className="btn soft sm" onClick={() => setAmount(String(q))}>{money(q, { compact: true })}</button>
           ))}
         </div>
+        {settings?.multi_gateway_enabled && availableGateways.length > 1 && (
+          <div className="field">
+            <label>Payment method</label>
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+              {availableGateways.map((g, i) => (
+                <button key={g} type="button"
+                  className={`btn ${gw === g ? "primary" : "soft"} sm`}
+                  onClick={() => setGw(g)}>
+                  Gateway {i + 1}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
         <button className="btn primary block lg" disabled={busy}>{busy ? "Processing…" : "Proceed to pay"}</button>
       </form>
 
@@ -120,7 +145,7 @@ export default function Deposit() {
               </div>
               <div className="body">
                 <div className="t">{money(d.amount)}</div>
-                <div className="s">{d.method || "deposit"} · {timeAgo(d.created_at)}</div>
+                <div className="s">{timeAgo(d.created_at)}</div>
               </div>
               <div className="end">
                 <span className={`pill ${d.status === "success" ? "success" : d.status === "failed" ? "danger" : "warn"}`}>{d.status}</span>
