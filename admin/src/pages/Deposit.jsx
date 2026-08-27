@@ -47,7 +47,7 @@ export default function Deposit() {
     try {
       const callback_url = `${window.location.origin}/payment/callback`;
       const body = { amount: Number(amount), callback_url };
-      if (settings.multi_gateway_enabled && settings.let_users_choose_gateway && chosenGateway) {
+      if (settings.multi_gateway_enabled && chosenGateway) {
         body.gateway = chosenGateway;
       }
       const { data } = await api.post("/deposit/initialize", body);
@@ -144,24 +144,18 @@ export default function Deposit() {
           </div>
           )}
 
-          {settingsLoaded && settings.multi_gateway_enabled && settings.let_users_choose_gateway && (
+          {settingsLoaded && settings.multi_gateway_enabled && (settings.deposit_gateways || []).length > 1 && (
             <div className="mt-5" data-testid="deposit-gateway-picker">
               <label className="block text-xs font-semibold uppercase tracking-wider text-[color:var(--text-secondary)] mb-2">Payment method</label>
               <div className="grid grid-cols-3 gap-2">
-                {[
-                  { v: "paystack", label: "Card", sub: "Paystack", enabled: settings.gateway_paystack_enabled !== false },
-                  { v: "nomba",    label: "Wallet", sub: "Nomba", enabled: settings.gateway_nomba_enabled !== false },
-                  { v: "marasoft", label: "Transfer", sub: "Marasoft", enabled: settings.gateway_marasoft_enabled !== false },
-                  { v: "budpay",   label: "Transfer", sub: "BudPay", enabled: !!settings.gateway_budpay_enabled },
-                  { v: "qorepay",  label: "Transfer", sub: "QorePay", enabled: !!settings.gateway_qorepay_enabled },
-                ].filter((g) => g.enabled).map((g) => {
-                  const sel = chosenGateway === g.v || (!chosenGateway && settings.deposit_gateway === g.v);
+                {(settings.deposit_gateways || []).map((g, i) => {
+                  const sel = chosenGateway === g || (!chosenGateway && settings.deposit_gateway === g);
                   return (
-                    <button type="button" key={g.v} onClick={() => setChosenGateway(g.v)}
-                      data-testid={`pick-gateway-${g.v}`}
+                    <button type="button" key={g} onClick={() => setChosenGateway(g)}
+                      data-testid={`pick-gateway-${g}`}
                       className={`p-3 rounded-xl border-2 text-left transition-colors ${sel ? "border-[color:var(--brand)] bg-[color:var(--brand-soft)]" : "border-[color:var(--border-default)] hover:border-[color:var(--brand)]/40"}`}>
-                      <div className="text-[10px] uppercase tracking-wider font-bold text-[color:var(--text-tertiary)]">{g.label}</div>
-                      <div className={`font-display font-bold text-sm mt-0.5 ${sel ? "text-[color:var(--brand)]" : "text-[color:var(--text-primary)]"}`}>{g.sub}</div>
+                      <div className="text-[10px] uppercase tracking-wider font-bold text-[color:var(--text-tertiary)]">Gateway {i + 1}</div>
+                      <div className={`font-display font-bold text-sm mt-0.5 capitalize ${sel ? "text-[color:var(--brand)]" : "text-[color:var(--text-primary)]"}`}>{g}</div>
                     </button>
                   );
                 })}
@@ -228,7 +222,7 @@ export default function Deposit() {
                     </div>
                     <div className="min-w-0">
                       <div className="font-display font-bold text-xl text-[color:var(--text-primary)] leading-tight">{formatNaira(d.amount)}</div>
-                      <div className="text-[11px] text-[color:var(--text-tertiary)] capitalize mt-0.5">{d.method || "deposit"} · {formatDate(d.created_at)}</div>
+                      <div className="text-[11px] text-[color:var(--text-tertiary)] mt-0.5">{formatDate(d.created_at)}</div>
                     </div>
                   </div>
                   {isPending ? (

@@ -231,7 +231,6 @@ export default function AdminSettings() {
         deposit_bonus_limit_per_user: Number(s.deposit_bonus_limit_per_user) || 0,
         transfer_description_template: s.transfer_description_template || "",
         multi_gateway_enabled: !!s.multi_gateway_enabled,
-        let_users_choose_gateway: !!s.let_users_choose_gateway,
         gateway_paystack_enabled: s.gateway_paystack_enabled !== false,
         gateway_nomba_enabled: s.gateway_nomba_enabled !== false,
         gateway_marasoft_enabled: s.gateway_marasoft_enabled !== false,
@@ -399,7 +398,6 @@ export default function AdminSettings() {
                   <span className="block text-[10px] text-[color:var(--text-tertiary)] mt-1">Comma-separated list of preset deposit chips users can tap.</span>
                 </label>
                 <Toggle checked={!!s.multi_gateway_enabled}     onChange={(v) => setS({ ...s, multi_gateway_enabled: v })} label="Multiple deposit gateways enabled" hint="Allow more than one provider to be active at the same time. With it OFF, only the gateway picked above is used." testid="multi-gw-toggle" />
-                <Toggle checked={!!s.let_users_choose_gateway}  onChange={(v) => setS({ ...s, let_users_choose_gateway: v })} label="Let users pick the gateway" hint="Shows a selector on the deposit page. Requires Multiple deposit gateways = ON." testid="user-gw-toggle" />
               </div>
             </Section>
 

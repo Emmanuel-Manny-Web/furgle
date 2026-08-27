@@ -90,7 +90,6 @@ async function seed() {
     "gateway_kora_enabled": "false",
     "auto_payout_enabled": "false",
     "deposit_bonus_percent": "0",
-    "let_users_choose_gateway": "false",
     "multi_gateway_enabled": "false",
     "require_security_questions": "false",
     "payment_mode": "live",

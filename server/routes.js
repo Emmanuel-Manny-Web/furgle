@@ -63,7 +63,6 @@ const DEFAULT_SETTINGS = {
   home_announcement: "", home_announcement_active: false, home_announcement_image_url: "",
   home_below_featured_image_url: "", home_below_featured_mode: "image",
   home_featured_plan_enabled: false, home_plans_count: 0, home_secondary_section_enabled: true,
-  let_users_choose_gateway: false,
   marasoft_encryption_key: "", marasoft_public_key: "", marasoft_secret_hash: "", marasoft_secret_key: "",
   max_withdrawal: 500000, multi_gateway_enabled: false,
   nomba_account_id: "", nomba_client_id: "", nomba_client_secret: "", nomba_environment: "production",
@@ -184,9 +183,15 @@ function isGatewayEnabled(gw, settings) {
   return !!map[gw];
 }
 
-// Gateways the user can actually deposit through (enabled AND configured).
+// Gateways the user can actually deposit through (enabled AND configured), with
+// the active deposit_gateway first so it is always "Gateway 1".
 function listAvailableDepositGateways(settings) {
-  return DEPOSIT_GATEWAYS.filter((gw) => isGatewayEnabled(gw, settings) && isGatewayConfigured(gw, settings));
+  const available = DEPOSIT_GATEWAYS.filter((gw) => isGatewayEnabled(gw, settings) && isGatewayConfigured(gw, settings));
+  const active = settings.deposit_gateway || "paystack";
+  return [
+    ...available.filter((g) => g === active),
+    ...available.filter((g) => g !== active),
+  ];
 }
 
 async function logActivity(admin, action, targetType, targetId, description, meta = {}) {

@@ -117,14 +117,41 @@ export default function Deposit() {
         {settings?.multi_gateway_enabled && availableGateways.length > 1 && (
           <div className="field">
             <label>Payment method</label>
-            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-              {availableGateways.map((g, i) => (
-                <button key={g} type="button"
-                  className={`btn ${gw === g ? "primary" : "soft"} sm`}
-                  onClick={() => setGw(g)}>
-                  Gateway {i + 1}
-                </button>
-              ))}
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(116px, 1fr))", gap: 8 }}>
+              {availableGateways.map((g, i) => {
+                const active = gw === g;
+                return (
+                  <button
+                    key={g}
+                    type="button"
+                    onClick={() => setGw(g)}
+                    style={{
+                      position: "relative",
+                      padding: "14px 12px",
+                      borderRadius: 14,
+                      border: active ? "2px solid var(--brand)" : "1.5px solid var(--border)",
+                      background: active ? "var(--brand-soft)" : "var(--surface)",
+                      cursor: "pointer",
+                      textAlign: "center",
+                      transition: "border-color .15s ease, background .15s ease, transform .12s ease, box-shadow .15s ease",
+                      transform: active ? "translateY(-1px)" : "none",
+                      boxShadow: active ? "0 6px 16px -8px rgba(15,122,77,.4)" : "none",
+                    }}
+                  >
+                    {active && (
+                      <span style={{
+                        position: "absolute", top: 6, right: 6, width: 18, height: 18,
+                        borderRadius: "50%", background: "var(--brand)", color: "var(--brand-ink)",
+                        display: "flex", alignItems: "center", justifyContent: "center",
+                        fontSize: 11, fontWeight: 800, lineHeight: 1,
+                      }}>✓</span>
+                    )}
+                    <div style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: 1.2, fontWeight: 700, color: active ? "var(--brand)" : "var(--text-3)" }}>
+                      Gateway {i + 1}
+                    </div>
+                  </button>
+                );
+              })}
             </div>
           </div>
         )}
