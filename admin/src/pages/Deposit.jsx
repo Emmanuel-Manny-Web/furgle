@@ -75,7 +75,7 @@ export default function Deposit() {
   };
 
   // Quickly resume a still-pending bank transfer
-  const pendingBankTransfer = history.find((d) => d.status === "pending" && d.method === "marasoft" && d.account_number);
+  const pendingBankTransfer = history.find((d) => d.status === "pending" && d.account_number);
 
   // Re-verify a single deposit (used by the Recheck button on failed/pending rows)
   const recheck = async (reference) => {

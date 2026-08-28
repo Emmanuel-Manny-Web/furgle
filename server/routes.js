@@ -418,6 +418,12 @@ router.get("/deposits", authMiddleware, async (req, res) => {
   res.json(rows);
 });
 
+router.get("/deposits/:reference", authMiddleware, async (req, res) => {
+  const row = await db.get("SELECT * FROM deposits WHERE reference = ? AND user_id = ?", req.params.reference, req.user.id);
+  if (!row) return res.status(404).json({ detail: "Deposit not found" });
+  res.json(row);
+});
+
 router.post("/deposit/initialize", authMiddleware, async (req, res) => {
   const { amount, gateway, callback_url } = req.body || {};
   const amt = Number(amount);

@@ -64,14 +64,26 @@ export default function DepositTransfer() {
   }, []);
 
   const expiresAt = useMemo(() => {
-    if (!deposit?.created_at) return null;
+    if (!deposit) return null;
+    if (deposit.expires_at) {
+      const t = new Date(deposit.expires_at).getTime();
+      if (!Number.isNaN(t)) return t;
+    }
+    if (!deposit.created_at) return null;
     const created = new Date(deposit.created_at).getTime();
+    if (Number.isNaN(created)) return null;
     return created + WINDOW_MINUTES * 60 * 1000;
+  }, [deposit]);
+
+  const createdAt = useMemo(() => {
+    if (!deposit?.created_at) return null;
+    const t = new Date(deposit.created_at).getTime();
+    return Number.isNaN(t) ? null : t;
   }, [deposit]);
 
   const remainingMs = expiresAt ? Math.max(0, expiresAt - now) : 0;
   const expired = !!expiresAt && remainingMs <= 0;
-  const totalMs = WINDOW_MINUTES * 60 * 1000;
+  const totalMs = expiresAt && createdAt ? Math.max(1, expiresAt - createdAt) : WINDOW_MINUTES * 60 * 1000;
   const percent = expiresAt ? Math.max(0, Math.min(100, (remainingMs / totalMs) * 100)) : 0;
   const mins = Math.floor(remainingMs / 60000);
   const secs = Math.floor((remainingMs % 60000) / 1000);
@@ -195,7 +207,7 @@ export default function DepositTransfer() {
             <p className="mt-2 text-[11px] text-[color:var(--text-tertiary)]">
               {expired
                 ? "This virtual account is no longer valid. Start a new deposit to get a fresh account."
-                : "Transfer before the timer ends — Marasoft will close the virtual account after expiry."}
+                : "Transfer before the timer ends — the provider will close the virtual account after expiry."}
             </p>
           </div>
 
@@ -230,7 +242,7 @@ export default function DepositTransfer() {
           )}
 
           {isFailed && !expired && (
-            <p className="mt-3 text-xs text-[color:var(--error)] text-center">Marasoft reported this transaction failed. Please start a new deposit.</p>
+            <p className="mt-3 text-xs text-[color:var(--error)] text-center">The provider reported this transaction failed. Please start a new deposit.</p>
           )}
         </div>
 
