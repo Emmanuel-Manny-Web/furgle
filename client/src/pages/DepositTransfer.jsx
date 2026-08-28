@@ -4,17 +4,13 @@ import { api, money } from "../api";
 import { useAuth } from "../auth";
 import { useToast, Icon } from "../components/ui";
 
-function formatExpiry(iso) {
-  const t = new Date(iso);
-  if (isNaN(t.getTime())) return null;
-  const diff = t.getTime() - Date.now();
-  if (diff <= 0) return "expired";
-  const mins = Math.max(1, Math.round(diff / 60000));
-  if (mins < 60) return `${mins} min`;
-  const hours = Math.round(mins / 60);
-  if (hours < 24) return `${hours} hr`;
-  const days = Math.round(hours / 24);
-  return `${days} day${days === 1 ? "" : "s"}`;
+function formatCountdown(ms) {
+  const total = Math.max(0, Math.floor(ms / 1000));
+  const h = Math.floor(total / 3600);
+  const m = Math.floor((total % 3600) / 60);
+  const s = total % 60;
+  const pad = (n) => String(n).padStart(2, "0");
+  return h > 0 ? `${pad(h)}:${pad(m)}:${pad(s)}` : `${pad(m)}:${pad(s)}`;
 }
 
 export default function DepositTransfer() {
@@ -25,12 +21,19 @@ export default function DepositTransfer() {
   const [dep, setDep] = useState(null);
   const [busy, setBusy] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [now, setNow] = useState(() => Date.now());
 
   useEffect(() => {
     api("/deposits")
       .then((r) => setDep((r || []).find((d) => d.reference === reference) || null))
       .catch(() => {});
   }, [reference]);
+
+  // Tick the countdown clock every second.
+  useEffect(() => {
+    const id = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(id);
+  }, []);
 
   const copyAccount = async () => {
     if (!dep || !dep.account_number) return;
@@ -65,7 +68,9 @@ export default function DepositTransfer() {
 
   if (!dep) return <div className="center-screen"><div className="spinner" /></div>;
 
-  const expiry = dep.expires_at ? formatExpiry(dep.expires_at) : null;
+  const expiresAt = dep.expires_at ? new Date(dep.expires_at).getTime() : null;
+  const remainingMs = expiresAt ? Math.max(0, expiresAt - now) : null;
+  const expired = expiresAt != null && remainingMs <= 0;
 
   return (
     <>
@@ -102,13 +107,15 @@ export default function DepositTransfer() {
           </div>
         )}
 
-        {expiry && (
+        {expiresAt != null && (
           <div className="list" style={{ marginTop: 8 }}>
             <div className="row">
               <div className="ic gold"><Icon.Clock /></div>
               <div className="body">
-                <div className="t">Expires in {expiry}</div>
-                <div className="s">Pay before the account expires</div>
+                <div className="t" style={{ fontFamily: "var(--font-display)", fontVariantNumeric: "tabular-nums", letterSpacing: 1 }}>
+                  {expired ? "Expired" : `Expires in ${formatCountdown(remainingMs)}`}
+                </div>
+                <div className="s">{expired ? "This account has expired — generate a new one" : "Pay before the account expires"}</div>
               </div>
             </div>
           </div>
