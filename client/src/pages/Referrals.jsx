@@ -22,6 +22,8 @@ export default function Referrals() {
 
   const gen1 = data?.gen1?.users || [];
   const gen2 = data?.gen2?.users || [];
+  const gen1Total = gen1.reduce((s, u) => s + Number(u.total_invested || 0), 0);
+  const gen2Total = gen2.reduce((s, u) => s + Number(u.total_invested || 0), 0);
   const members = level === "1" ? gen1.map((u) => ({ ...u, lvl: 1 })) : gen2.map((u) => ({ ...u, lvl: 2 }));
 
   return (
@@ -50,8 +52,8 @@ export default function Referrals() {
           style={{ cursor: "pointer", outline: level === "1" ? "2px solid var(--brand)" : "2px solid transparent", outlineOffset: -2 }}
         >
           <div className="ic brand"><Icon.Team /></div>
-          <div className="v">{gen1.length}</div>
-          <div className="l">Level 1</div>
+          <div className="v">{money(gen1Total, { compact: true })}</div>
+          <div className="l">Level 1 invested</div>
         </div>
         <div
           className="stat"
@@ -62,8 +64,8 @@ export default function Referrals() {
           style={{ cursor: "pointer", outline: level === "2" ? "2px solid var(--brand)" : "2px solid transparent", outlineOffset: -2 }}
         >
           <div className="ic gold"><Icon.Team /></div>
-          <div className="v">{gen2.length}</div>
-          <div className="l">Level 2</div>
+          <div className="v">{money(gen2Total, { compact: true })}</div>
+          <div className="l">Level 2 invested</div>
         </div>
       </div>
 
