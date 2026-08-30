@@ -52,8 +52,9 @@ export default function Referrals() {
           style={{ cursor: "pointer", outline: level === "1" ? "2px solid var(--brand)" : "2px solid transparent", outlineOffset: -2 }}
         >
           <div className="ic brand"><Icon.Team /></div>
-          <div className="v">{money(gen1Total, { compact: true })}</div>
+          <div className="v">{money(gen1Total)}</div>
           <div className="l">Level 1 invested</div>
+          <div className="s">{gen1.length} member{gen1.length === 1 ? "" : "s"}</div>
         </div>
         <div
           className="stat"
@@ -64,8 +65,9 @@ export default function Referrals() {
           style={{ cursor: "pointer", outline: level === "2" ? "2px solid var(--brand)" : "2px solid transparent", outlineOffset: -2 }}
         >
           <div className="ic gold"><Icon.Team /></div>
-          <div className="v">{money(gen2Total, { compact: true })}</div>
+          <div className="v">{money(gen2Total)}</div>
           <div className="l">Level 2 invested</div>
+          <div className="s">{gen2.length} member{gen2.length === 1 ? "" : "s"}</div>
         </div>
       </div>
 
