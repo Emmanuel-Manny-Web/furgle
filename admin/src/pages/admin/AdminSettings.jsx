@@ -210,6 +210,11 @@ export default function AdminSettings() {
         nekpay_secret_key: s.nekpay_secret_key || "",
         nekpay_channel_code: s.nekpay_channel_code || "",
         nekpay_notify_url: s.nekpay_notify_url || "",
+        glopay_mch_id: s.glopay_mch_id || "",
+        glopay_key: s.glopay_key || "",
+        glopay_collection_code: s.glopay_collection_code || "",
+        glopay_payment_code: s.glopay_payment_code || "",
+        glopay_base_url: s.glopay_base_url || "",
         fixie_proxy_url: s.fixie_proxy_url || "",
         lumenhub_proxy_url: s.lumenhub_proxy_url || "",
         lumenhub_base_url: s.lumenhub_base_url || "",
@@ -219,6 +224,7 @@ export default function AdminSettings() {
         gateway_duplo_enabled: !!s.gateway_duplo_enabled,
         gateway_kora_enabled: !!s.gateway_kora_enabled,
         gateway_nekpay_enabled: !!s.gateway_nekpay_enabled,
+        gateway_glopay_enabled: !!s.gateway_glopay_enabled,
         deposit_gateway: s.deposit_gateway || "paystack",
         payout_gateway: s.payout_gateway || "paystack",
         payment_mode: s.payment_mode || "mock",
@@ -360,6 +366,7 @@ export default function AdminSettings() {
                 <GatewayCard active={s.deposit_gateway === "duplo"} label="Checkout" name="Duplo" sub="Checkout · NGN" onClick={() => setS({ ...s, deposit_gateway: "duplo" })} testid="dep-gw-duplo" />
                 <GatewayCard active={s.deposit_gateway === "kora"} label="Transfer" name="Kora" sub="Bank transfer · NGN" onClick={() => setS({ ...s, deposit_gateway: "kora" })} testid="dep-gw-kora" />
                 <GatewayCard active={s.deposit_gateway === "nekpay"} label="Transfer" name="Nekpay" sub="Bank transfer · NGN" onClick={() => setS({ ...s, deposit_gateway: "nekpay" })} testid="dep-gw-nekpay" />
+                <GatewayCard active={s.deposit_gateway === "glopay"} label="Checkout" name="GloPay" sub="Hosted checkout · NGN" onClick={() => setS({ ...s, deposit_gateway: "glopay" })} testid="dep-gw-glopay" />
               </div>
             </Section>
 
@@ -412,6 +419,7 @@ export default function AdminSettings() {
                 <Toggle checked={!!s.gateway_duplo_enabled} onChange={(v) => setS({ ...s, gateway_duplo_enabled: v })} label="Duplo" hint="Checkout · NGN" testid="gw-enabled-duplo" />
                 <Toggle checked={!!s.gateway_kora_enabled} onChange={(v) => setS({ ...s, gateway_kora_enabled: v })} label="Kora" hint="Bank transfer · NGN" testid="gw-enabled-kora" />
                 <Toggle checked={!!s.gateway_nekpay_enabled} onChange={(v) => setS({ ...s, gateway_nekpay_enabled: v })} label="Nekpay" hint="Bank transfer · NGN" testid="gw-enabled-nekpay" />
+                <Toggle checked={!!s.gateway_glopay_enabled} onChange={(v) => setS({ ...s, gateway_glopay_enabled: v })} label="GloPay" hint="Hosted checkout · NGN" testid="gw-enabled-glopay" />
               </div>
             </Section>
           </>
@@ -427,6 +435,7 @@ export default function AdminSettings() {
                 <GatewayCard active={s.payout_gateway === "duplo"} label="Payout" name="Duplo" sub="Duplo bank payout" onClick={() => setS({ ...s, payout_gateway: "duplo" })} testid="payout-gw-duplo" />
                 <GatewayCard active={s.payout_gateway === "kora"} label="Payout" name="Kora" sub="Kora bank payout" onClick={() => setS({ ...s, payout_gateway: "kora" })} testid="payout-gw-kora" />
                 <GatewayCard active={s.payout_gateway === "nekpay"} label="Payout" name="Nekpay" sub="Nekpay bank payout" onClick={() => setS({ ...s, payout_gateway: "nekpay" })} testid="payout-gw-nekpay" />
+                <GatewayCard active={s.payout_gateway === "glopay"} label="Payout" name="GloPay" sub="GloPay bank payout" onClick={() => setS({ ...s, payout_gateway: "glopay" })} testid="payout-gw-glopay" />
               </div>
             </Section>
 
@@ -650,6 +659,16 @@ export default function AdminSettings() {
                 <SecretField label="Secret key (payout)" value={s.nekpay_secret_key} onChange={(v) => setS({ ...s, nekpay_secret_key: v })} testid="nekpay-secret-key" />
               </div>
               <p className="text-[11px] text-[color:var(--text-tertiary)] mt-3"><span className="font-bold text-[color:var(--text-primary)]">Webhook URL:</span> <code className="break-all">{(process.env.REACT_APP_BACKEND_URL || "")}/api/deposit/webhook/nekpay</code></p>
+            </Section>
+
+            <Section title="GloPay credentials" hint="Used for GloPay deposits (collection) & payouts (payment). Credentials come from your GloPay merchant backend. Calls go directly to GloPay (not routed through LumenHub).">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <Field label="Merchant ID" value={s.glopay_mch_id} text onChange={(v) => setS({ ...s, glopay_mch_id: v })} testid="glopay-mch-id" />
+                <SecretField label="Signing key (gloKeys)" value={s.glopay_key} onChange={(v) => setS({ ...s, glopay_key: v })} testid="glopay-key" />
+                <Field label="Collection channel code" value={s.glopay_collection_code} text onChange={(v) => setS({ ...s, glopay_collection_code: v })} placeholder="e.g. 423" testid="glopay-collection-code" />
+                <Field label="Payment channel code" value={s.glopay_payment_code} text onChange={(v) => setS({ ...s, glopay_payment_code: v })} placeholder="e.g. 523" testid="glopay-payment-code" />
+              </div>
+              <p className="text-[11px] text-[color:var(--text-tertiary)] mt-3"><span className="font-bold text-[color:var(--text-primary)]">Webhook URL:</span> <code className="break-all">{(process.env.REACT_APP_BACKEND_URL || "")}/api/deposit/webhook/glopay</code></p>
             </Section>
 
             <Section title="Fixie outbound proxy" hint="Used only by JuntPay and Nekpay. Paste the full Fixie URL (including the http://…token@host:port part).">

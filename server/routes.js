@@ -13,6 +13,7 @@ const duplo = require("./duplo");
 const nomba = require("./nomba");
 const kora = require("./kora");
 const nekpay = require("./nekpay");
+const glopay = require("./glopay");
 const polling = require("./polling");
 
 const router = express.Router();
@@ -87,6 +88,8 @@ const DEFAULT_SETTINGS = {
   gateway_nekpay_enabled: false,
   nekpay_mcht_id: "", nekpay_payment_key: "", nekpay_secret_key: "",
   nekpay_channel_code: "", nekpay_notify_url: "",
+  gateway_glopay_enabled: false,
+  glopay_mch_id: "", glopay_key: "", glopay_collection_code: "", glopay_payment_code: "", glopay_base_url: "",
   fixie_proxy_url: "",
   lumenhub_proxy_url: "",
   lumenhub_base_url: "",
@@ -162,11 +165,12 @@ function isGatewayConfigured(gw, settings) {
   if (gw === "duplo") return !!settings.duplo_api_key;
   if (gw === "kora") return !!settings.kora_secret_key;
   if (gw === "nekpay") return !!(settings.nekpay_payment_key && settings.nekpay_mcht_id);
+  if (gw === "glopay") return !!(settings.glopay_key && settings.glopay_mch_id);
   return false;
 }
 
 // Canonical order of deposit gateways (used for stable "Gateway 1/2/3…" labels).
-const DEPOSIT_GATEWAYS = ["paystack", "nomba", "marasoft", "budpay", "qorepay", "juntpay", "duplo", "kora", "nekpay"];
+const DEPOSIT_GATEWAYS = ["paystack", "nomba", "marasoft", "budpay", "qorepay", "juntpay", "duplo", "kora", "nekpay", "glopay"];
 
 function isGatewayEnabled(gw, settings) {
   const map = {
@@ -179,6 +183,7 @@ function isGatewayEnabled(gw, settings) {
     duplo: !!settings.gateway_duplo_enabled,
     kora: !!settings.gateway_kora_enabled,
     nekpay: !!settings.gateway_nekpay_enabled,
+    glopay: !!settings.gateway_glopay_enabled,
   };
   return !!map[gw];
 }
@@ -503,6 +508,31 @@ router.post("/deposit/initialize", authMiddleware, async (req, res) => {
     const data = result.data || {};
 
     await db.run("INSERT INTO deposits (id, user_id, amount, reference, method, status, gateway_id, pay_order_id) VALUES (?, ?, ?, ?, 'nekpay', 'pending', ?, ?)", id, req.user.id, amt, reference, data.orderNo || null, data.orderNo || null);
+
+    return res.status(201).json({
+      id, reference, amount: amt, status: "pending",
+      mode: "live", type: "redirect", authorization_url: data.payUrl,
+    });
+  }
+
+  if (gw === "glopay") {
+    const cfg = glopay.getConfig(settings);
+    if (!cfg.key || !cfg.mchId) return res.status(400).json({ detail: "GloPay is not configured (missing merchant ID or key)" });
+    const notifyUrl = baseUrl + "/api/deposit/webhook/glopay";
+    const email = emailFromName(req.user.name);
+    const result = await glopay.createDeposit({
+      orderId: reference,
+      amount: amt,
+      name: req.user.name || "Customer",
+      email,
+      mobile: req.user.phone || "08000000000",
+      notifyUrl,
+    }, cfg);
+
+    if (result.error) return res.status(502).json({ detail: result.error });
+    const data = result.data || {};
+
+    await db.run("INSERT INTO deposits (id, user_id, amount, reference, method, status, gateway_id, pay_order_id) VALUES (?, ?, ?, ?, 'glopay', 'pending', ?, ?)", id, req.user.id, amt, reference, reference, reference);
 
     return res.status(201).json({
       id, reference, amount: amt, status: "pending",
@@ -856,6 +886,51 @@ router.post("/deposit/webhook/nekpay", async (req, res) => {
   }
 
   return res.type("text/plain").send("success");
+});
+
+// GloPay payment hook callback (JSON). One notify URL handles both deposit
+// (collection) and payout (payment) notifications, matched by merchantOrderId.
+router.post("/deposit/webhook/glopay", async (req, res) => {
+  const body = req.body || {};
+  const merchantOrderId = String(body.merchantOrderId || body.merchantOrderNo || "");
+  const returnCode = String(body.returnCode ?? body.return_code ?? "");
+  if (!merchantOrderId) return res.send("ok");
+
+  // Best-effort signature verification.
+  const settings = await getAllSettings();
+  const cfg = glopay.getConfig(settings);
+  if (cfg.key && body.sign && !glopay.verifyCallback(body, cfg.key)) {
+    return res.status(400).send("bad sign");
+  }
+
+  // Deposit (collection) — the reference doubles as the merchant order id.
+  const dep = await db.get("SELECT * FROM deposits WHERE reference = ?", merchantOrderId);
+  if (dep) {
+    if (returnCode === "00") {
+      if (dep.status !== "success") {
+        await db.run("UPDATE deposits SET status = 'success', updated_at = to_char(now() AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI:SS') WHERE id = ?", dep.id);
+        await addTransaction(dep.user_id, "deposit", dep.amount, "Deposit", { reference: dep.reference, gateway: "glopay" });
+        await creditDepositBonus(dep.user_id, dep.amount, dep.reference);
+      }
+    } else if (dep.status !== "failed") {
+      await db.run("UPDATE deposits SET status = 'failed', updated_at = to_char(now() AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI:SS') WHERE id = ?", dep.id);
+    }
+    return res.send("ok");
+  }
+
+  // Payout (payment) — the withdrawal reference doubles as the merchant order id.
+  const wd = await db.get("SELECT * FROM withdrawals WHERE reference = ?", merchantOrderId);
+  if (wd) {
+    if (returnCode === "00") {
+      await db.run("UPDATE withdrawals SET status = 'success', updated_at = to_char(now() AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI:SS'), processed_at = to_char(now() AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI:SS') WHERE id = ?", wd.id);
+    } else if (wd.status !== "rejected") {
+      await db.run("UPDATE withdrawals SET status = 'rejected', failure_reason = ?, updated_at = to_char(now() AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI:SS') WHERE id = ?", "GloPay payout failed", wd.id);
+      await addTransaction(wd.user_id, "refund", wd.amount, "Payout failed", { withdrawal_id: wd.id });
+    }
+    return res.send("ok");
+  }
+
+  return res.send("ok");
 });
 
 // Paystack webhook — handles charge.success (deposits) and transfer.* (payouts).
@@ -1223,6 +1298,30 @@ async function executePayout(wd, settings) {
     return { ok: true, status: "processing", reference: data.tradeNo };
   }
 
+  if (payoutGateway === "glopay") {
+    const cfg = glopay.getConfig(settings);
+    if (!cfg.key || !cfg.mchId) return { ok: false, error: "GloPay is not configured (missing merchant ID or key)" };
+    let bankCode = wd.bank_code;
+    const resolved = await resolveBankCodeForGateway("glopay", wd.bank_name, settings);
+    if (resolved) bankCode = resolved;
+    if (!wd.account_number || !bankCode) return { ok: false, error: "Missing bank account number or bank code" };
+
+    const result = await glopay.createPayout({
+      orderId: wd.reference,
+      amount: wd.net_amount || wd.amount,
+      name: wd.account_name || "Customer",
+      account: String(wd.account_number),
+      bankCode: String(bankCode),
+      email: "payout@lumenhub.com",
+      mobile: (await db.get("SELECT phone FROM users WHERE id = ?", wd.user_id))?.phone || "08000000000",
+    }, cfg);
+
+    if (result.error) return { ok: false, error: result.error };
+    await db.run("UPDATE withdrawals SET bank_code = ?, gateway = 'glopay', gateway_reference = ? WHERE id = ?", bankCode, wd.reference, wd.id);
+    // GloPay payout is async; the callback notifies the final status.
+    return { ok: true, status: "processing", reference: wd.reference };
+  }
+
   // Other gateways are simulated in this local clone.
   return { ok: true, status: "success", reference: null };
 }
@@ -1261,7 +1360,7 @@ router.post("/withdrawal/request", authMiddleware, async (req, res) => {
   const id = "w_" + uuidv4().replace(/-/g, "").slice(0, 16);
   const reference = "wd_" + uuidv4().replace(/-/g, "").slice(0, 16);
   const payoutGateway = settings.payout_gateway || "nomba";
-  const gatewayCol = ["juntpay", "paystack", "duplo", "nomba", "kora", "nekpay"].includes(payoutGateway) ? payoutGateway : null;
+  const gatewayCol = ["juntpay", "paystack", "duplo", "nomba", "kora", "nekpay", "glopay"].includes(payoutGateway) ? payoutGateway : null;
   await db.run("INSERT INTO withdrawals (id, user_id, amount, fee, net_amount, reference, method, status, bank_name, account_number, account_name, bank_code, gateway) VALUES (?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?, ?)", id, req.user.id, amt, fee, net, reference, payoutGateway, req.user.bank_name, req.user.account_number, req.user.account_name, req.user.bank_code, gatewayCol);
 
   await addTransaction(req.user.id, "withdrawal", -amt, "Withdrawal request", { withdrawal_id: id });
@@ -1491,6 +1590,14 @@ async function resolveBankCodeForGateway(gateway, bankName, settings) {
     const match = nekpay.BANKS.find((b) => bankCanonicalKey(b.name) === key);
     return match ? match.code : null;
   }
+  if (gateway === "glopay") {
+    // GloPay uses its own fixed sys_code bank-code list.
+    const exact = findBankByName(glopay.BANKS, name);
+    if (exact) return exact.code;
+    const key = bankCanonicalKey(name);
+    const match = glopay.BANKS.find((b) => bankCanonicalKey(b.name) === key);
+    return match ? match.code : null;
+  }
   // Paystack / default scheme
   const exact = findBankByName(HARDCODED_BANKS, name);
   if (exact) return exact.code;
@@ -1539,6 +1646,9 @@ router.get("/banks", async (req, res) => {
   }
   if (payoutGateway === "nekpay") {
     return res.json(nekpay.BANKS);
+  }
+  if (payoutGateway === "glopay") {
+    return res.json(glopay.BANKS);
   }
   res.json(HARDCODED_BANKS);
 });
@@ -2710,6 +2820,11 @@ router.get("/admin/settings", async (req, res) => {
   s.nekpay_secret_key = s.nekpay_secret_key || process.env.NEKPAY_SECRET_KEY || "";
   s.nekpay_channel_code = s.nekpay_channel_code || process.env.NEKPAY_CHANNEL_CODE || "";
   s.nekpay_notify_url = s.nekpay_notify_url || process.env.NEKPAY_NOTIFY_URL || "";
+  s.glopay_mch_id = s.glopay_mch_id || process.env.GLOPAY_MCH_ID || "";
+  s.glopay_key = s.glopay_key || process.env.GLOPAY_KEY || "";
+  s.glopay_collection_code = s.glopay_collection_code || process.env.GLOPAY_COLLECTION_CODE || "";
+  s.glopay_payment_code = s.glopay_payment_code || process.env.GLOPAY_PAYMENT_CODE || "";
+  s.glopay_base_url = s.glopay_base_url || process.env.GLOPAY_BASE_URL || "";
   s.lumenhub_proxy_url = s.lumenhub_proxy_url || process.env.LUMENHUB_PROXY_URL || "";
   s.lumenhub_base_url = s.lumenhub_base_url || process.env.LUMENHUB_BASE_URL || "";
   res.json({ id: "global", ...s });
