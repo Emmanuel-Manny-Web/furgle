@@ -89,7 +89,7 @@ const DEFAULT_SETTINGS = {
   nekpay_mcht_id: "", nekpay_payment_key: "", nekpay_secret_key: "",
   nekpay_channel_code: "", nekpay_notify_url: "",
   gateway_glopay_enabled: false,
-  glopay_mch_id: "", glopay_key: "", glopay_collection_code: "", glopay_payment_code: "", glopay_base_url: "",
+  glopay_mch_id: "", glopay_key: "", glopay_collection_key: "", glopay_payment_key: "", glopay_collection_code: "", glopay_payment_code: "", glopay_base_url: "",
   fixie_proxy_url: "",
   lumenhub_proxy_url: "",
   lumenhub_base_url: "",
@@ -165,7 +165,7 @@ function isGatewayConfigured(gw, settings) {
   if (gw === "duplo") return !!settings.duplo_api_key;
   if (gw === "kora") return !!settings.kora_secret_key;
   if (gw === "nekpay") return !!(settings.nekpay_payment_key && settings.nekpay_mcht_id);
-  if (gw === "glopay") return !!(settings.glopay_key && settings.glopay_mch_id);
+  if (gw === "glopay") return !!(settings.glopay_mch_id && (settings.glopay_collection_key || settings.glopay_key));
   return false;
 }
 
@@ -517,7 +517,7 @@ router.post("/deposit/initialize", authMiddleware, async (req, res) => {
 
   if (gw === "glopay") {
     const cfg = glopay.getConfig(settings);
-    if (!cfg.key || !cfg.mchId) return res.status(400).json({ detail: "GloPay is not configured (missing merchant ID or key)" });
+    if (!cfg.collectionKey || !cfg.mchId) return res.status(400).json({ detail: "GloPay is not configured (missing merchant ID or collection key)" });
     const notifyUrl = baseUrl + "/api/deposit/webhook/glopay";
     const email = emailFromName(req.user.name);
     const result = await glopay.createDeposit({
@@ -899,7 +899,7 @@ router.post("/deposit/webhook/glopay", async (req, res) => {
   // Best-effort signature verification.
   const settings = await getAllSettings();
   const cfg = glopay.getConfig(settings);
-  if (cfg.key && body.sign && !glopay.verifyCallback(body, cfg.key)) {
+  if (body.sign && !glopay.verifyCallback(body, cfg)) {
     return res.status(400).send("bad sign");
   }
 
@@ -1300,7 +1300,7 @@ async function executePayout(wd, settings) {
 
   if (payoutGateway === "glopay") {
     const cfg = glopay.getConfig(settings);
-    if (!cfg.key || !cfg.mchId) return { ok: false, error: "GloPay is not configured (missing merchant ID or key)" };
+    if (!cfg.paymentKey || !cfg.mchId) return { ok: false, error: "GloPay is not configured (missing merchant ID or payment key)" };
     let bankCode = wd.bank_code;
     const resolved = await resolveBankCodeForGateway("glopay", wd.bank_name, settings);
     if (resolved) bankCode = resolved;
@@ -2822,6 +2822,8 @@ router.get("/admin/settings", async (req, res) => {
   s.nekpay_notify_url = s.nekpay_notify_url || process.env.NEKPAY_NOTIFY_URL || "";
   s.glopay_mch_id = s.glopay_mch_id || process.env.GLOPAY_MCH_ID || "";
   s.glopay_key = s.glopay_key || process.env.GLOPAY_KEY || "";
+  s.glopay_collection_key = s.glopay_collection_key || process.env.GLOPAY_COLLECTION_KEY || "";
+  s.glopay_payment_key = s.glopay_payment_key || process.env.GLOPAY_PAYMENT_KEY || "";
   s.glopay_collection_code = s.glopay_collection_code || process.env.GLOPAY_COLLECTION_CODE || "";
   s.glopay_payment_code = s.glopay_payment_code || process.env.GLOPAY_PAYMENT_CODE || "";
   s.glopay_base_url = s.glopay_base_url || process.env.GLOPAY_BASE_URL || "";

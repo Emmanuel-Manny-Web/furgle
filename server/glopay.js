@@ -14,9 +14,12 @@ const BASE = "https://www.glopayment.net";
 
 function getConfig(settings) {
   const s = settings || {};
+  const sharedKey = s.glopay_key || process.env.GLOPAY_KEY || "";
   return {
     mchId: s.glopay_mch_id || process.env.GLOPAY_MCH_ID || "",
-    key: s.glopay_key || process.env.GLOPAY_KEY || "",
+    key: sharedKey,
+    collectionKey: s.glopay_collection_key || process.env.GLOPAY_COLLECTION_KEY || sharedKey,
+    paymentKey: s.glopay_payment_key || process.env.GLOPAY_PAYMENT_KEY || sharedKey,
     collectionCode: s.glopay_collection_code || process.env.GLOPAY_COLLECTION_CODE || "",
     paymentCode: s.glopay_payment_code || process.env.GLOPAY_PAYMENT_CODE || "",
     baseUrl: s.glopay_base_url || process.env.GLOPAY_BASE_URL || BASE,
@@ -83,7 +86,7 @@ async function createDeposit({ orderId, amount, name, email, mobile }, cfg) {
     email: email || "customer@lumenhub.com",
     mobile: mobile || "08000000000",
   };
-  body.sign = sign(body, cfg.key);
+  body.sign = sign(body, cfg.collectionKey);
 
   try {
     const r = await post("/pay/order/actions/commit", body, cfg);
@@ -111,7 +114,7 @@ async function createPayout({ orderId, amount, name, account, bankCode, number, 
     email: email || "payout@lumenhub.com",
     mobile: mobile || "08000000000",
   };
-  body.sign = sign(body, cfg.key);
+  body.sign = sign(body, cfg.paymentKey);
 
   try {
     const r = await post("/payment/order/actions/commit", body, cfg);
@@ -126,11 +129,16 @@ async function createPayout({ orderId, amount, name, account, bankCode, number, 
 }
 
 // Verify a callback signature. The callback body contains a `sign` field; all
-// other fields are signed with the same algorithm.
-function verifyCallback(body, key) {
+// other fields are signed with the same algorithm. The callback doesn't state
+// whether it's a collection or payment event, so try both keys.
+function verifyCallback(body, cfg) {
   if (!body || !body.sign) return false;
   const { sign: sig, ...rest } = body;
-  return sign(rest, key) === sig;
+  const keys = [];
+  if (cfg && cfg.collectionKey) keys.push(cfg.collectionKey);
+  if (cfg && cfg.paymentKey && !keys.includes(cfg.paymentKey)) keys.push(cfg.paymentKey);
+  if (cfg && cfg.key && !keys.includes(cfg.key)) keys.push(cfg.key);
+  return keys.some((k) => sign(rest, k) === sig);
 }
 
 // GloPay Nigerian bank codes (sys_code), from the GloPay bank-code export.

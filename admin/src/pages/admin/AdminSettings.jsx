@@ -212,6 +212,8 @@ export default function AdminSettings() {
         nekpay_notify_url: s.nekpay_notify_url || "",
         glopay_mch_id: s.glopay_mch_id || "",
         glopay_key: s.glopay_key || "",
+        glopay_collection_key: s.glopay_collection_key || "",
+        glopay_payment_key: s.glopay_payment_key || "",
         glopay_collection_code: s.glopay_collection_code || "",
         glopay_payment_code: s.glopay_payment_code || "",
         glopay_base_url: s.glopay_base_url || "",
@@ -664,7 +666,8 @@ export default function AdminSettings() {
             <Section title="GloPay credentials" hint="Used for GloPay deposits (collection) & payouts (payment). Credentials come from your GloPay merchant backend. Calls go directly to GloPay (not routed through LumenHub).">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <Field label="Merchant ID" value={s.glopay_mch_id} text onChange={(v) => setS({ ...s, glopay_mch_id: v })} testid="glopay-mch-id" />
-                <SecretField label="Signing key (gloKeys)" value={s.glopay_key} onChange={(v) => setS({ ...s, glopay_key: v })} testid="glopay-key" />
+                <SecretField label="Collection key (collection)" value={s.glopay_collection_key} onChange={(v) => setS({ ...s, glopay_collection_key: v })} testid="glopay-collection-key" />
+                <SecretField label="Payment key (payout)" value={s.glopay_payment_key} onChange={(v) => setS({ ...s, glopay_payment_key: v })} testid="glopay-payment-key" />
                 <Field label="Collection channel code" value={s.glopay_collection_code} text onChange={(v) => setS({ ...s, glopay_collection_code: v })} placeholder="e.g. 423" testid="glopay-collection-code" />
                 <Field label="Payment channel code" value={s.glopay_payment_code} text onChange={(v) => setS({ ...s, glopay_payment_code: v })} placeholder="e.g. 523" testid="glopay-payment-code" />
               </div>
