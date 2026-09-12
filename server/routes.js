@@ -79,7 +79,7 @@ const DEFAULT_SETTINGS = {
   withdrawal_end_time: "18:00", withdrawal_fee_percent: 15, withdrawal_start_time: "10:30", withdrawals_open: true,
   gateway_juntpay_enabled: false,
   juntpay_app_id: "", juntpay_merchant_id: "", juntpay_secret_key: "",
-  juntpay_deposit_way_code: "", juntpay_payout_way_code: "BANK_ACCOUNT", juntpay_notify_url: "",
+  juntpay_deposit_way_code: "", juntpay_payout_way_code: "BANK_TRANSFER", juntpay_notify_url: "",
   gateway_duplo_enabled: false,
   duplo_api_key: "",
   gateway_kora_enabled: false,
