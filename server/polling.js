@@ -262,12 +262,13 @@ async function refreshWithdrawalStatus(withdrawalId) {
 }
 
 // Poll pending deposits against the configured gateway(s), with backoff + bounded work.
+const POLLABLE_DEPOSIT_METHODS = ["juntpay", "paystack", "duplo", "nomba", "kora", "nekpay"];
+const POLLABLE_PAYOUT_GATEWAYS = ["juntpay", "paystack", "duplo", "nomba", "kora"];
+
 async function pollDeposits(gateway) {
-  const methods = gateway && !["juntpay", "paystack", "duplo", "nomba", "kora"].includes(gateway)
-    ? []
-    : gateway
-      ? [gateway]
-      : ["juntpay", "paystack", "duplo", "nomba", "kora"];
+  const methods = gateway
+    ? (POLLABLE_DEPOSIT_METHODS.includes(gateway) ? [gateway] : [])
+    : POLLABLE_DEPOSIT_METHODS;
 
   // No matching gateway (e.g. an un-integrated provider selected) — nothing to scan.
   if (methods.length === 0) {
@@ -307,10 +308,10 @@ async function pollWithdrawals() {
   const nowIso = new Date().toISOString();
   const rows = await db.all(
     `SELECT * FROM withdrawals
-     WHERE status IN ('pending','processing') AND gateway IN ('juntpay','paystack','duplo','nomba','kora')
-       AND (next_poll_at IS NULL OR next_poll_at <= ?)
-     ORDER BY created_at ASC LIMIT 100`,
-    nowIso
+      WHERE status IN ('pending','processing') AND gateway IN (${POLLABLE_PAYOUT_GATEWAYS.map(() => "?").join(",")})
+        AND (next_poll_at IS NULL OR next_poll_at <= ?)
+      ORDER BY created_at ASC LIMIT 100`,
+    ...POLLABLE_PAYOUT_GATEWAYS, nowIso
   );
 
   let refreshed = 0, marked_paid = 0, marked_rejected = 0;
@@ -333,8 +334,8 @@ async function pollWithdrawals() {
 // Poll a single user's pending deposits and withdrawals (immediate, on-demand).
 async function pollUser(userId) {
   const deps = await db.all(
-    "SELECT * FROM deposits WHERE status = 'pending' AND user_id = ? AND method IN ('juntpay','paystack','duplo','nomba','kora')",
-    userId
+    `SELECT * FROM deposits WHERE status = 'pending' AND user_id = ? AND method IN (${POLLABLE_DEPOSIT_METHODS.map(() => "?").join(",")})`,
+    userId, ...POLLABLE_DEPOSIT_METHODS
   );
   await mapLimit(deps, 5, async (dep) => {
     const status = await checkDepositStatus(dep);
@@ -348,8 +349,8 @@ async function pollUser(userId) {
   });
 
   const wds = await db.all(
-    "SELECT * FROM withdrawals WHERE status IN ('pending','processing') AND user_id = ? AND gateway IN ('juntpay','paystack','duplo','nomba','kora')",
-    userId
+    `SELECT * FROM withdrawals WHERE status IN ('pending','processing') AND user_id = ? AND gateway IN (${POLLABLE_PAYOUT_GATEWAYS.map(() => "?").join(",")})`,
+    userId, ...POLLABLE_PAYOUT_GATEWAYS
   );
   await mapLimit(wds, 5, async (w) => {
     const status = await checkWithdrawalStatus(w);
