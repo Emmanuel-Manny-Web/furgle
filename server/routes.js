@@ -156,16 +156,18 @@ function isWithdrawalWindowOpen(settings) {
 
 // Whether a given deposit gateway has its required credentials configured.
 function isGatewayConfigured(gw, settings) {
-  if (gw === "paystack") return !!settings.paystack_secret_key;
-  if (gw === "nomba") return !!settings.nomba_client_secret && !!settings.nomba_account_id;
+  // Credentials may live in the DB (admin-saved) or in .env; treat either as
+  // "configured" so gateways configured only via .env still show on the user end.
+  if (gw === "paystack") return !!(settings.paystack_secret_key || process.env.PAYSTACK_SECRET_KEY);
+  if (gw === "nomba") return !!((settings.nomba_client_secret || process.env.NOMBA_CLIENT_SECRET) && (settings.nomba_account_id || process.env.NOMBA_ACCOUNT_ID));
   if (gw === "marasoft") return !!settings.marasoft_secret_key && !!settings.marasoft_public_key;
   if (gw === "budpay") return !!settings.budpay_secret_key && !!settings.budpay_public_key;
   if (gw === "qorepay") return !!settings.qorepay_secret_key && !!settings.qorepay_brand_id;
-  if (gw === "juntpay") return !!settings.juntpay_secret_key;
-  if (gw === "duplo") return !!settings.duplo_api_key;
-  if (gw === "kora") return !!settings.kora_secret_key;
-  if (gw === "nekpay") return !!(settings.nekpay_payment_key && settings.nekpay_mcht_id);
-  if (gw === "glopay") return !!(settings.glopay_mch_id && (settings.glopay_collection_key || settings.glopay_key));
+  if (gw === "juntpay") return !!(settings.juntpay_secret_key || process.env.JUNTPAY_SECRET_KEY);
+  if (gw === "duplo") return !!(settings.duplo_api_key || process.env.DUPLO_API_KEY);
+  if (gw === "kora") return !!(settings.kora_secret_key || process.env.KORA_SECRET_KEY);
+  if (gw === "nekpay") return !!((settings.nekpay_payment_key || process.env.NEKPAY_PAYMENT_KEY) && (settings.nekpay_mcht_id || process.env.NEKPAY_MCHT_ID));
+  if (gw === "glopay") return !!((settings.glopay_mch_id || process.env.GLOPAY_MCH_ID) && (settings.glopay_collection_key || process.env.GLOPAY_COLLECTION_KEY || settings.glopay_key || process.env.GLOPAY_KEY));
   return false;
 }
 
@@ -1842,6 +1844,9 @@ const SECRET_SETTING_KEYS = new Set([
   "paystack_secret_key", "budpay_secret_key", "budpay_webhook_secret",
   "marasoft_secret_key", "marasoft_encryption_key", "marasoft_secret_hash",
   "nomba_client_secret", "qorepay_secret_key", "juntpay_secret_key",
+  "duplo_api_key", "kora_secret_key", "kora_encryption_key",
+  "nekpay_payment_key", "nekpay_secret_key",
+  "glopay_key", "glopay_collection_key", "glopay_payment_key",
 ]);
 
 router.get("/settings/public", async (req, res) => {
