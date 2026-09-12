@@ -5,6 +5,7 @@ const paystack = require("./paystack");
 const duplo = require("./duplo");
 const nomba = require("./nomba");
 const kora = require("./kora");
+const nekpay = require("./nekpay");
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -154,6 +155,15 @@ async function checkDepositStatus(dep) {
     const cfg = kora.getConfig(settings);
     const r = await kora.isVirtualAccountPaid(dep.gateway_id || dep.reference, dep.amount, cfg).catch(() => ({ paid: false }));
     return r.paid ? "success" : "pending";
+  }
+  if (dep.method === "nekpay") {
+    const cfg = nekpay.getConfig(settings);
+    const result = await nekpay.queryPayment(dep.reference, cfg).catch(() => null);
+    if (!result || result.error || !result.data) return "pending";
+    const tr = String(result.data.tradeResult);
+    if (tr === "1") return "success";
+    if (tr === "2" || tr === "3") return "failed";
+    return "pending";
   }
   return "pending";
 }

@@ -136,6 +136,27 @@ async function createPayout(params, cfg) {
   }
 }
 
+// Query a collection (payment) order status. Returns { data: { tradeResult, respCode, orderNo, tradeMsg } }.
+// tradeResult: 0 = generated/pending, 1 = success, 2 = failed.
+async function queryPayment(mchOrderNo, cfg) {
+  const body = {
+    mch_id: cfg.mchtId,
+    mch_order_no: mchOrderNo,
+  };
+  body.sign_type = "MD5";
+  body.sign = sign(body, cfg.paymentKey);
+  try {
+    const r = await post("/query/order", body, cfg);
+    if (!r.body) return { error: "Nekpay returned an empty response" };
+    if (r.body.respCode && r.body.respCode !== "SUCCESS") {
+      return { error: r.body.tradeMsg || "Nekpay query failed" };
+    }
+    return { data: { tradeResult: r.body.tradeResult, respCode: r.body.respCode, orderNo: r.body.orderNo, mchOrderNo: r.body.mchOrderNo } };
+  } catch (err) {
+    return { error: err.message };
+  }
+}
+
 // Nekpay Nigerian bank codes (NGRxxx). Used to translate the stored bank name
 // into the code Nekpay expects for a payout. Sourced from Nekpay's docs.
 const BANKS = [
@@ -176,4 +197,4 @@ const BANKS = [
   { code: "NGR999991", name: "PalmPay" },
 ];
 
-module.exports = { BASE, sign, getConfig, createDeposit, createPayout, BANKS };
+module.exports = { BASE, sign, getConfig, createDeposit, createPayout, queryPayment, BANKS };
