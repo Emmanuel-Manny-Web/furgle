@@ -463,7 +463,6 @@ router.post("/deposit/initialize", authMiddleware, async (req, res) => {
       customerEmail: emailFromName(req.user.name),
       notifyUrl,
       returnUrl,
-      extParam: { user_id: req.user.id, deposit_id: id },
     }, cfg);
 
     if (result.error) return res.status(502).json({ detail: result.error });
@@ -1156,7 +1155,6 @@ async function executePayout(wd, settings) {
       customerMobile: (await db.get("SELECT phone FROM users WHERE id = ?", wd.user_id))?.phone || "",
       customerEmail: "payout@lumenhub.com",
       notifyUrl: cfg.notifyUrl || "",
-      extParam: { withdrawal_id: wd.id, user_id: wd.user_id },
     }, cfg);
 
     if (result.error) return { ok: false, error: result.error };
