@@ -86,18 +86,29 @@ async function markDepositFailed(dep) {
 }
 
 // Escalating backoff so abandoned records aren't re-polled every cycle forever.
+// Returns null once a record is old enough to stop polling (cancelled).
 function backoffMs(createdAt) {
   const parsed = createdAt ? new Date(createdAt).getTime() : NaN;
   const age = Number.isNaN(parsed) ? 0 : Math.max(0, Date.now() - parsed);
   if (age < 10 * 60 * 1000) return 30 * 1000;      // < 10 min: poll every 30s
-  if (age < 60 * 60 * 1000) return 5 * 60 * 1000;  // < 1h: every 5min
-  if (age < DAY_MS) return 15 * 60 * 1000;         // < 24h: every 15min
-  return 30 * 60 * 1000;                           // otherwise: every 30min
+  if (age < 60 * 60 * 1000) return 10 * 60 * 1000; // 10 min – 1 hr: every 10 min
+  if (age < DAY_MS) return 30 * 60 * 1000;         // 1 hr – 24 hr: every 30 min
+  return null;                                     // > 24 hr: cancel, stop polling
 }
 
 async function touchPoll(table, id, createdAt) {
+  const backoff = backoffMs(createdAt);
+  if (backoff === null) {
+    // Old enough to give up: cancel deposits, stop polling withdrawals.
+    if (table === "deposits") {
+      await db.run("UPDATE deposits SET status = 'cancelled', next_poll_at = NULL WHERE id = ?", id);
+    } else {
+      await db.run("UPDATE withdrawals SET next_poll_at = NULL WHERE id = ?", id);
+    }
+    return;
+  }
   const now = new Date().toISOString();
-  const next = new Date(Date.now() + backoffMs(createdAt)).toISOString();
+  const next = new Date(Date.now() + backoff).toISOString();
   await db.run(`UPDATE ${table} SET last_polled_at = ?, next_poll_at = ? WHERE id = ?`, now, next, id);
 }
 
