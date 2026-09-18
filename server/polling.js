@@ -6,6 +6,7 @@ const duplo = require("./duplo");
 const nomba = require("./nomba");
 const kora = require("./kora");
 const nekpay = require("./nekpay");
+const fossapay = require("./fossapay");
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -176,6 +177,18 @@ async function checkDepositStatus(dep) {
     if (tr === "2" || tr === "3") return "failed";
     return "pending";
   }
+  if (dep.method === "fossapay") {
+    // Checkout deposits (expires_at set) are verifiable by reference; persistent
+    // virtual-account deposits are webhook-driven, so they stay "pending" here.
+    if (!dep.expires_at) return "pending";
+    const cfg = fossapay.getConfig(settings);
+    const result = await fossapay.getCheckoutByReference(dep.reference, cfg).catch(() => null);
+    if (!result || result.error || !result.data) return "pending";
+    const st = String(result.data.status || "").toLowerCase();
+    if (st === "completed") return "success";
+    if (["failed", "expired", "reversed"].includes(st)) return "failed";
+    return "pending";
+  }
   return "pending";
 }
 
@@ -227,6 +240,15 @@ async function checkWithdrawalStatus(w) {
     if (["failed", "reversed", "rejected", "cancelled"].includes(s)) return "failed";
     return "pending";
   }
+  if (w.gateway === "fossapay") {
+    const cfg = fossapay.getConfig(settings);
+    const result = await fossapay.verifyPayout(w.reference, cfg).catch(() => null);
+    if (!result || result.error || !result.data) return "pending";
+    const s = String(result.data.status || "").toLowerCase();
+    if (s === "completed") return "success";
+    if (["failed", "reversed"].includes(s)) return "failed";
+    return "pending";
+  }
   return "pending";
 }
 
@@ -273,8 +295,8 @@ async function refreshWithdrawalStatus(withdrawalId) {
 }
 
 // Poll pending deposits against the configured gateway(s), with backoff + bounded work.
-const POLLABLE_DEPOSIT_METHODS = ["juntpay", "paystack", "duplo", "nomba", "kora", "nekpay"];
-const POLLABLE_PAYOUT_GATEWAYS = ["juntpay", "paystack", "duplo", "nomba", "kora"];
+const POLLABLE_DEPOSIT_METHODS = ["juntpay", "paystack", "duplo", "nomba", "kora", "nekpay", "fossapay"];
+const POLLABLE_PAYOUT_GATEWAYS = ["juntpay", "paystack", "duplo", "nomba", "kora", "fossapay"];
 
 async function pollDeposits(gateway) {
   const methods = gateway

@@ -217,6 +217,9 @@ export default function AdminSettings() {
         glopay_collection_code: s.glopay_collection_code || "",
         glopay_payment_code: s.glopay_payment_code || "",
         glopay_base_url: s.glopay_base_url || "",
+        fossapay_api_key: s.fossapay_api_key || "",
+        fossapay_webhook_secret: s.fossapay_webhook_secret || "",
+        fossapay_deposit_method: s.fossapay_deposit_method || "virtual_account",
         fixie_proxy_url: s.fixie_proxy_url || "",
         lumenhub_proxy_url: s.lumenhub_proxy_url || "",
         lumenhub_base_url: s.lumenhub_base_url || "",
@@ -227,6 +230,7 @@ export default function AdminSettings() {
         gateway_kora_enabled: !!s.gateway_kora_enabled,
         gateway_nekpay_enabled: !!s.gateway_nekpay_enabled,
         gateway_glopay_enabled: !!s.gateway_glopay_enabled,
+        gateway_fossapay_enabled: !!s.gateway_fossapay_enabled,
         deposit_gateway: s.deposit_gateway || "paystack",
         payout_gateway: s.payout_gateway || "paystack",
         payment_mode: s.payment_mode || "mock",
@@ -369,6 +373,7 @@ export default function AdminSettings() {
                 <GatewayCard active={s.deposit_gateway === "kora"} label="Transfer" name="Kora" sub="Bank transfer · NGN" onClick={() => setS({ ...s, deposit_gateway: "kora" })} testid="dep-gw-kora" />
                 <GatewayCard active={s.deposit_gateway === "nekpay"} label="Transfer" name="Nekpay" sub="Bank transfer · NGN" onClick={() => setS({ ...s, deposit_gateway: "nekpay" })} testid="dep-gw-nekpay" />
                 <GatewayCard active={s.deposit_gateway === "glopay"} label="Checkout" name="GloPay" sub="Hosted checkout · NGN" onClick={() => setS({ ...s, deposit_gateway: "glopay" })} testid="dep-gw-glopay" />
+                <GatewayCard active={s.deposit_gateway === "fossapay"} label="Transfer" name="FossaPay" sub="Virtual account / checkout" onClick={() => setS({ ...s, deposit_gateway: "fossapay" })} testid="dep-gw-fossapay" />
               </div>
             </Section>
 
@@ -422,6 +427,7 @@ export default function AdminSettings() {
                 <Toggle checked={!!s.gateway_kora_enabled} onChange={(v) => setS({ ...s, gateway_kora_enabled: v })} label="Kora" hint="Bank transfer · NGN" testid="gw-enabled-kora" />
                 <Toggle checked={!!s.gateway_nekpay_enabled} onChange={(v) => setS({ ...s, gateway_nekpay_enabled: v })} label="Nekpay" hint="Bank transfer · NGN" testid="gw-enabled-nekpay" />
                 <Toggle checked={!!s.gateway_glopay_enabled} onChange={(v) => setS({ ...s, gateway_glopay_enabled: v })} label="GloPay" hint="Hosted checkout · NGN" testid="gw-enabled-glopay" />
+                <Toggle checked={!!s.gateway_fossapay_enabled} onChange={(v) => setS({ ...s, gateway_fossapay_enabled: v })} label="FossaPay" hint="Virtual account / checkout · NGN" testid="gw-enabled-fossapay" />
               </div>
             </Section>
           </>
@@ -438,6 +444,7 @@ export default function AdminSettings() {
                 <GatewayCard active={s.payout_gateway === "kora"} label="Payout" name="Kora" sub="Kora bank payout" onClick={() => setS({ ...s, payout_gateway: "kora" })} testid="payout-gw-kora" />
                 <GatewayCard active={s.payout_gateway === "nekpay"} label="Payout" name="Nekpay" sub="Nekpay bank payout" onClick={() => setS({ ...s, payout_gateway: "nekpay" })} testid="payout-gw-nekpay" />
                 <GatewayCard active={s.payout_gateway === "glopay"} label="Payout" name="GloPay" sub="GloPay bank payout" onClick={() => setS({ ...s, payout_gateway: "glopay" })} testid="payout-gw-glopay" />
+                <GatewayCard active={s.payout_gateway === "fossapay"} label="Payout" name="FossaPay" sub="FossaPay master-wallet payout" onClick={() => setS({ ...s, payout_gateway: "fossapay" })} testid="payout-gw-fossapay" />
               </div>
             </Section>
 
@@ -674,6 +681,21 @@ export default function AdminSettings() {
               <p className="text-[11px] text-[color:var(--text-tertiary)] mt-3"><span className="font-bold text-[color:var(--text-primary)]">Webhook URL:</span> <code className="break-all">{(process.env.REACT_APP_BACKEND_URL || "")}/api/deposit/webhook/glopay</code></p>
             </Section>
 
+            <Section title="FossaPay credentials" hint="Used for FossaPay deposits (virtual account / checkout) & payouts (master wallet). Requests are routed through the LumenHub proxy.">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <SecretField label="API key" value={s.fossapay_api_key} onChange={(v) => setS({ ...s, fossapay_api_key: v })} placeholder="fk_production_..." testid="fossapay-api-key" />
+                <SecretField label="Webhook secret" value={s.fossapay_webhook_secret} onChange={(v) => setS({ ...s, fossapay_webhook_secret: v })} placeholder="HMAC-SHA256 secret" testid="fossapay-webhook-secret" />
+              </div>
+              <div className="mt-3">
+                <label className="text-xs font-bold text-[color:var(--text-secondary)] uppercase tracking-wide">Deposit method</label>
+                <div className="grid grid-cols-2 gap-2 mt-2">
+                  <GatewayCard active={(s.fossapay_deposit_method || "virtual_account") === "virtual_account"} label="Fixed" name="Virtual account" sub="Persistent customer account" onClick={() => setS({ ...s, fossapay_deposit_method: "virtual_account" })} testid="fossapay-method-virtual-account" />
+                  <GatewayCard active={s.fossapay_deposit_method === "checkout"} label="One-time" name="Checkout" sub="30-minute checkout account" onClick={() => setS({ ...s, fossapay_deposit_method: "checkout" })} testid="fossapay-method-checkout" />
+                </div>
+              </div>
+              <p className="text-[11px] text-[color:var(--text-tertiary)] mt-3"><span className="font-bold text-[color:var(--text-primary)]">Webhook URL:</span> <code className="break-all">{(process.env.REACT_APP_BACKEND_URL || "")}/api/deposit/webhook/fossapay</code></p>
+            </Section>
+
             <Section title="Fixie outbound proxy" hint="Used only by JuntPay and Nekpay. Paste the full Fixie URL (including the http://…token@host:port part).">
               <SecretField
                 label="Fixie proxy URL"
@@ -685,7 +707,7 @@ export default function AdminSettings() {
               />
             </Section>
 
-            <Section title="LumenHub outbound proxy" hint="Used by Paystack, Nomba, Duplo and Kora. Paste the full proxy URL (e.g. your lumenhubtech.com forward proxy).">
+            <Section title="LumenHub outbound proxy" hint="Used by Paystack, Nomba, Duplo, Kora and FossaPay. Paste the full proxy URL (e.g. your lumenhubtech.com forward proxy).">
               <SecretField
                 label="LumenHub proxy URL"
                 value={s.lumenhub_proxy_url}

@@ -336,6 +336,7 @@ async function init() {
 
   // Migrations for columns added after the initial schema.
   await pool.query("ALTER TABLE deposits ADD COLUMN IF NOT EXISTS expires_at TEXT");
+  await pool.query("ALTER TABLE deposits ADD COLUMN IF NOT EXISTS pay_amount DOUBLE PRECISION");
 
   return db;
 }

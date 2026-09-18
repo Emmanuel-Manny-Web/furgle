@@ -14,6 +14,7 @@ const nomba = require("./nomba");
 const kora = require("./kora");
 const nekpay = require("./nekpay");
 const glopay = require("./glopay");
+const fossapay = require("./fossapay");
 const polling = require("./polling");
 
 const router = express.Router();
@@ -90,6 +91,8 @@ const DEFAULT_SETTINGS = {
   nekpay_channel_code: "", nekpay_notify_url: "",
   gateway_glopay_enabled: false,
   glopay_mch_id: "", glopay_key: "", glopay_collection_key: "", glopay_payment_key: "", glopay_collection_code: "", glopay_payment_code: "", glopay_base_url: "",
+  gateway_fossapay_enabled: false,
+  fossapay_api_key: "", fossapay_webhook_secret: "", fossapay_deposit_method: "virtual_account",
   fixie_proxy_url: "",
   lumenhub_proxy_url: "",
   lumenhub_base_url: "",
@@ -168,11 +171,12 @@ function isGatewayConfigured(gw, settings) {
   if (gw === "kora") return !!(settings.kora_secret_key || process.env.KORA_SECRET_KEY);
   if (gw === "nekpay") return !!((settings.nekpay_payment_key || process.env.NEKPAY_PAYMENT_KEY) && (settings.nekpay_mcht_id || process.env.NEKPAY_MCHT_ID));
   if (gw === "glopay") return !!((settings.glopay_mch_id || process.env.GLOPAY_MCH_ID) && (settings.glopay_collection_key || process.env.GLOPAY_COLLECTION_KEY || settings.glopay_key || process.env.GLOPAY_KEY));
+  if (gw === "fossapay") return !!(settings.fossapay_api_key || process.env.FOSSAPAY_API_KEY);
   return false;
 }
 
 // Canonical order of deposit gateways (used for stable "Gateway 1/2/3…" labels).
-const DEPOSIT_GATEWAYS = ["paystack", "nomba", "marasoft", "budpay", "qorepay", "juntpay", "duplo", "kora", "nekpay", "glopay"];
+const DEPOSIT_GATEWAYS = ["paystack", "nomba", "marasoft", "budpay", "qorepay", "juntpay", "duplo", "kora", "nekpay", "glopay", "fossapay"];
 
 function isGatewayEnabled(gw, settings) {
   const map = {
@@ -186,6 +190,7 @@ function isGatewayEnabled(gw, settings) {
     kora: !!settings.gateway_kora_enabled,
     nekpay: !!settings.gateway_nekpay_enabled,
     glopay: !!settings.gateway_glopay_enabled,
+    fossapay: !!settings.gateway_fossapay_enabled,
   };
   return !!map[gw];
 }
@@ -541,6 +546,40 @@ router.post("/deposit/initialize", authMiddleware, async (req, res) => {
     });
   }
 
+  if (gw === "fossapay") {
+    const cfg = fossapay.getConfig(settings);
+    if (!cfg.apiKey) return res.status(400).json({ detail: "FossaPay is not configured (missing API key)" });
+    const name = req.user.name || "Customer";
+    // Unique email per user so FossaPay's per-merchant unique-email rule never collides.
+    const email = `fp-${req.user.id}@lumenhub.com`;
+    const method = settings.fossapay_deposit_method || "virtual_account";
+
+    if (method === "checkout") {
+      const result = await fossapay.createCheckout({ amount: amt, reference, name, email, phone: req.user.phone || "" }, cfg);
+      if (result.error) return res.status(502).json({ detail: result.error });
+      const d = result.data;
+      await db.run("INSERT INTO deposits (id, user_id, amount, reference, method, status, bank_name, account_number, account_name, gateway_id, virtual_account_number, expires_at, pay_amount) VALUES (?, ?, ?, ?, 'fossapay', 'pending', ?, ?, ?, ?, ?, ?, ?)", id, req.user.id, amt, reference, d.bank_name || null, d.account_number || null, d.account_name || null, reference, d.account_number || null, d.expires_at || null, d.amount_payable != null ? d.amount_payable : null);
+      return res.status(201).json({ id, reference, amount: amt, status: "pending", type: "bank_transfer", bank_name: d.bank_name, account_number: d.account_number, account_name: d.account_name, expires_at: d.expires_at, amount_payable: d.amount_payable });
+    }
+
+    // Persistent virtual account — reuse the user's existing FossaPay account.
+    const prev = await db.get(
+      "SELECT gateway_id, account_number, account_name, bank_name FROM deposits WHERE user_id = ? AND method = 'fossapay' AND account_number IS NOT NULL AND expires_at IS NULL ORDER BY created_at DESC LIMIT 1",
+      req.user.id
+    );
+    let d;
+    if (prev && prev.account_number) {
+      d = { customer_id: prev.gateway_id, account_number: prev.account_number, account_name: prev.account_name, bank_name: prev.bank_name };
+    } else {
+      const result = await fossapay.createVirtualAccount({ name, email, phone: req.user.phone || "", reference }, cfg);
+      if (result.error) return res.status(502).json({ detail: result.error });
+      d = result.data;
+    }
+
+    await db.run("INSERT INTO deposits (id, user_id, amount, reference, method, status, bank_name, account_number, account_name, gateway_id, virtual_account_number) VALUES (?, ?, ?, ?, 'fossapay', 'pending', ?, ?, ?, ?, ?)", id, req.user.id, amt, reference, d.bank_name || null, d.account_number || null, d.account_name || null, d.customer_id || null, d.account_number || null);
+    return res.status(201).json({ id, reference, amount: amt, status: "pending", type: "bank_transfer", bank_name: d.bank_name, account_number: d.account_number, account_name: d.account_name });
+  }
+
   if (gw === "paystack") {
     const cfg = paystack.getConfig(settings);
     if (!cfg.secretKey) return res.status(400).json({ detail: "Paystack is not configured (missing secret key)" });
@@ -788,6 +827,30 @@ router.get("/deposit/verify/:reference", async (req, res) => {
     return res.json({ status: dep.status === "success" ? "success" : "pending", reference: dep.reference, amount: dep.amount });
   }
 
+  if (dep.method === "fossapay") {
+    // Checkout deposits are verifiable by reference; persistent virtual-account
+    // deposits are credited via the async webhook (this call returns pending).
+    if (dep.expires_at) {
+      const cfg = fossapay.getConfig(await getAllSettings());
+      const result = await fossapay.getCheckoutByReference(dep.reference, cfg);
+      const st = result.data ? String(result.data.status || "").toLowerCase() : "";
+      if (st === "completed") {
+        if (dep.status !== "success") {
+          await db.run("UPDATE deposits SET status = 'success', updated_at = to_char(now() AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI:SS') WHERE id = ?", dep.id);
+          await addTransaction(dep.user_id, "deposit", dep.amount, "Deposit", { reference: dep.reference, gateway: "fossapay" });
+          await creditDepositBonus(dep.user_id, dep.amount, dep.reference);
+        }
+        return res.json({ status: "success", reference: dep.reference, amount: dep.amount });
+      }
+      if (["failed", "expired", "reversed"].includes(st)) {
+        await db.run("UPDATE deposits SET status = 'failed', updated_at = to_char(now() AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI:SS') WHERE id = ?", dep.id);
+        return res.json({ status: "failed", reference: dep.reference, amount: dep.amount });
+      }
+      return res.json({ status: "pending", reference: dep.reference, amount: dep.amount });
+    }
+    return res.json({ status: dep.status, reference: dep.reference, amount: dep.amount });
+  }
+
   const isMock = await getAllSettings().payment_mode !== "live";
   if (isMock) {
     if (dep.status === "pending") {
@@ -932,6 +995,62 @@ router.post("/deposit/webhook/glopay", async (req, res) => {
   }
 
   return res.send("ok");
+});
+
+// FossaPay webhook — one URL handles deposit.completed (persistent VA),
+// checkout.completed (one-time checkout) and payout.* (withdrawals).
+// Signature: HMAC-SHA256(webhookSecret, JSON.stringify(body.data)) in
+// x-fossapay-Signature.
+router.post("/deposit/webhook/fossapay", async (req, res) => {
+  const body = req.body || {};
+  const cfg = fossapay.getConfig(await getAllSettings());
+
+  if (cfg.webhookSecret) {
+    const sig = String(req.headers["x-fossapay-signature"] || "");
+    const expected = crypto.createHmac("sha256", cfg.webhookSecret).update(JSON.stringify(body.data || {})).digest("hex");
+    if (!sig || sig !== expected) return res.status(401).send("INVALID_SIGNATURE");
+  }
+
+  const eventType = String(body.eventType || "");
+  const data = body.data || {};
+
+  if (eventType === "deposit.completed") {
+    const accountNumber = String((data.recipient && data.recipient.accountNumber) || "");
+    const customerId = String(data.customerId || "");
+    let dep = null;
+    if (accountNumber) dep = await db.get("SELECT * FROM deposits WHERE account_number = ? AND method = 'fossapay'", accountNumber);
+    if (!dep && customerId) dep = await db.get("SELECT * FROM deposits WHERE gateway_id = ? AND method = 'fossapay'", customerId);
+    if (dep && dep.status !== "success") {
+      await db.run("UPDATE deposits SET status = 'success', updated_at = to_char(now() AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI:SS') WHERE id = ?", dep.id);
+      await addTransaction(dep.user_id, "deposit", dep.amount, "Deposit", { reference: dep.reference, gateway: "fossapay" });
+      await creditDepositBonus(dep.user_id, dep.amount, dep.reference);
+    }
+  } else if (eventType === "checkout.completed" || eventType === "checkout.failed" || eventType === "checkout.expired" || eventType === "checkout.reversed") {
+    const reference = String(data.reference || "");
+    const dep = reference ? await db.get("SELECT * FROM deposits WHERE reference = ? AND method = 'fossapay'", reference) : null;
+    if (dep) {
+      if (eventType === "checkout.completed" && dep.status !== "success") {
+        await db.run("UPDATE deposits SET status = 'success', updated_at = to_char(now() AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI:SS') WHERE id = ?", dep.id);
+        await addTransaction(dep.user_id, "deposit", dep.amount, "Deposit", { reference: dep.reference, gateway: "fossapay" });
+        await creditDepositBonus(dep.user_id, dep.amount, dep.reference);
+      } else if (eventType !== "checkout.completed" && dep.status !== "failed") {
+        await db.run("UPDATE deposits SET status = 'failed', updated_at = to_char(now() AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI:SS') WHERE id = ?", dep.id);
+      }
+    }
+  } else if (eventType === "payout.completed" || eventType === "payout.failed" || eventType === "payout.reversed") {
+    const reference = String(data.reference || "");
+    const wd = reference ? await db.get("SELECT * FROM withdrawals WHERE reference = ?", reference) : null;
+    if (wd) {
+      if (eventType === "payout.completed") {
+        await db.run("UPDATE withdrawals SET status = 'success', updated_at = to_char(now() AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI:SS'), processed_at = to_char(now() AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI:SS') WHERE id = ?", wd.id);
+      } else if (wd.status !== "rejected") {
+        await db.run("UPDATE withdrawals SET status = 'rejected', failure_reason = ?, updated_at = to_char(now() AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI:SS') WHERE id = ?", "FossaPay payout " + eventType, wd.id);
+        await addTransaction(wd.user_id, "refund", wd.amount, "Payout failed", { withdrawal_id: wd.id });
+      }
+    }
+  }
+
+  res.status(200).send("OK");
 });
 
 // Paystack webhook — handles charge.success (deposits) and transfer.* (payouts).
@@ -1322,6 +1441,32 @@ async function executePayout(wd, settings) {
     return { ok: true, status: "processing", reference: wd.reference };
   }
 
+  if (payoutGateway === "fossapay") {
+    const cfg = fossapay.getConfig(settings);
+    if (!cfg.apiKey) return { ok: false, error: "FossaPay is not configured (missing API key)" };
+    let bankCode = wd.bank_code;
+    const resolved = await resolveBankCodeForGateway("fossapay", wd.bank_name, settings);
+    if (resolved) bankCode = resolved;
+    if (!wd.account_number || !bankCode) return { ok: false, error: "Missing bank account number or bank code" };
+
+    const result = await fossapay.createPayout({
+      amount: wd.net_amount || wd.amount,
+      reference: wd.reference,
+      bank_code: String(bankCode),
+      bank_name: wd.bank_name || String(bankCode),
+      account_name: wd.account_name || "Customer",
+      account_number: String(wd.account_number),
+    }, cfg);
+
+    if (result.error) return { ok: false, error: result.error };
+    const data = result.data || {};
+    await db.run("UPDATE withdrawals SET bank_code = ?, gateway = 'fossapay', gateway_reference = ? WHERE id = ?", bankCode, data.payout_id || data.reference || null, wd.id);
+    const status = String(data.status || "").toLowerCase();
+    if (status === "completed") return { ok: true, status: "success", reference: data.reference };
+    if (status === "failed" || status === "reversed") return { ok: false, status: "rejected", reference: data.reference, error: "FossaPay rejected the payout" };
+    return { ok: true, status: "processing", reference: data.reference };
+  }
+
   // Other gateways are simulated in this local clone.
   return { ok: true, status: "success", reference: null };
 }
@@ -1598,6 +1743,16 @@ async function resolveBankCodeForGateway(gateway, bankName, settings) {
     const match = glopay.BANKS.find((b) => bankCanonicalKey(b.name) === key);
     return match ? match.code : null;
   }
+  if (gateway === "fossapay") {
+    const cfg = fossapay.getConfig(settings);
+    const result = await fossapay.listBanks(cfg);
+    const list = result.error || !result.data ? HARDCODED_BANKS : result.data;
+    const exact = findBankByName(list, name);
+    if (exact) return exact.code;
+    const key = bankCanonicalKey(name);
+    const match = list.find((b) => bankCanonicalKey(b.name) === key);
+    return match ? match.code : null;
+  }
   // Paystack / default scheme
   const exact = findBankByName(HARDCODED_BANKS, name);
   if (exact) return exact.code;
@@ -1650,6 +1805,12 @@ router.get("/banks", async (req, res) => {
   if (payoutGateway === "glopay") {
     return res.json(glopay.BANKS);
   }
+  if (payoutGateway === "fossapay") {
+    const cfg = fossapay.getConfig(settings);
+    const result = await fossapay.listBanks(cfg);
+    if (!result.error && result.data && result.data.length > 0) return res.json(result.data);
+    return res.json(HARDCODED_BANKS);
+  }
   res.json(HARDCODED_BANKS);
 });
 
@@ -1670,6 +1831,9 @@ async function resolveAccountViaGateway(gw, account_number, bank_code, settings)
   } else if (gw === "kora") {
     cfg = kora.getConfig(settings);
     result = await kora.resolveAccount(account_number, bank_code, cfg);
+  } else if (gw === "fossapay") {
+    cfg = fossapay.getConfig(settings);
+    result = await fossapay.resolveAccount(account_number, bank_code, cfg);
   } else {
     return null;
   }
@@ -1686,7 +1850,7 @@ router.post("/banks/resolve", authMiddleware, async (req, res) => {
   // bank code from the bank name first, so a stale/mismatched code from the
   // client (e.g. a Paystack code) doesn't break the enquiry for the current
   // gateway (e.g. Duplo).
-  if (["paystack", "duplo", "nomba", "kora"].includes(payoutGateway)) {
+  if (["paystack", "duplo", "nomba", "kora", "fossapay"].includes(payoutGateway)) {
     let targetCode = bank_code;
     if (bank_name) {
       const mapped = await resolveBankCodeForGateway(payoutGateway, bank_name, settings);
@@ -2561,6 +2725,19 @@ router.post("/admin/withdrawals/:id/pay-nekpay", async (req, res) => {
   res.json({ mode: newStatus });
 });
 
+router.post("/admin/withdrawals/:id/pay-fossapay", async (req, res) => {
+  const w = await db.get("SELECT * FROM withdrawals WHERE id = ?", req.params.id);
+  if (!w) return res.status(404).json({ detail: "Not found" });
+  const { bank_code } = req.body || {};
+  if (bank_code) await db.run("UPDATE withdrawals SET bank_code = ? WHERE id = ?", String(bank_code), w.id);
+  const outcome = await executePayout(w, { ...await getAllSettings(), payout_gateway: "fossapay" });
+  if (!outcome.ok) { await recordGatewayPayoutFailure(w, outcome.error, "fossapay"); return res.status(502).json({ detail: outcome.error || "Payout failed" }); }
+  const newStatus = outcome.status === "success" ? "success" : "processing";
+  await db.run("UPDATE withdrawals SET status = ?, processed_at = to_char(now() AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI:SS'), updated_at = to_char(now() AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI:SS') WHERE id = ?", newStatus, w.id);
+  await logActivity(req.user, "withdrawal.paid_fossapay", "withdrawal", w.id, `Paid via FossaPay (${newStatus})`);
+  res.json({ mode: newStatus });
+});
+
 router.get("/admin/investments", async (req, res) => {
   const limit = Number(req.query.limit || 50);
   const rows = await db.all(`SELECT i.*, u.name as user_name, u.phone as user_phone FROM investments i JOIN users u ON u.id = i.user_id ORDER BY i.started_at DESC LIMIT ?`, limit);
@@ -2830,6 +3007,8 @@ router.get("/admin/settings", async (req, res) => {
   s.glopay_collection_code = s.glopay_collection_code || process.env.GLOPAY_COLLECTION_CODE || "";
   s.glopay_payment_code = s.glopay_payment_code || process.env.GLOPAY_PAYMENT_CODE || "";
   s.glopay_base_url = s.glopay_base_url || process.env.GLOPAY_BASE_URL || "";
+  s.fossapay_api_key = s.fossapay_api_key || process.env.FOSSAPAY_API_KEY || "";
+  s.fossapay_webhook_secret = s.fossapay_webhook_secret || process.env.FOSSAPAY_WEBHOOK_SECRET || process.env.FOSSAPAY_WEHBOOK_SECRET || "";
   s.lumenhub_proxy_url = s.lumenhub_proxy_url || process.env.LUMENHUB_PROXY_URL || "";
   s.lumenhub_base_url = s.lumenhub_base_url || process.env.LUMENHUB_BASE_URL || "";
   res.json({ id: "global", ...s });

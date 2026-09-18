@@ -84,7 +84,7 @@ export default function DepositTransfer() {
         <div style={{ textAlign: "center", padding: "8px 0 16px" }}>
           <div className="page-sub" style={{ fontSize: 11 }}>Send exactly</div>
           <div className="hero" style={{ padding: "16px 20px", borderRadius: 16, marginTop: 8 }}>
-            <div className="balance" style={{ fontSize: 32 }}>{money(dep.amount)}</div>
+            <div className="balance" style={{ fontSize: 32 }}>{money(dep.pay_amount ?? dep.amount)}</div>
           </div>
         </div>
 
