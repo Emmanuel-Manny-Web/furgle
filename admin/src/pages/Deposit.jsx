@@ -200,7 +200,6 @@ export default function Deposit() {
             const tone = d.status === "success" ? "success" : d.status === "failed" ? "error" : "warn";
             const isHighlighted = highlightRef === d.reference;
             const isPending = d.status === "pending";
-            const isFailed = d.status === "failed";
             const isMarasoft = d.method === "marasoft";
             const isBusy = !!rechecking[d.reference];
             const cfg = {
@@ -237,14 +236,14 @@ export default function Deposit() {
                   <span className="text-[10px] uppercase tracking-wider text-[color:var(--text-tertiary)] shrink-0">Ref</span>
                   <span className="font-mono text-[11px] text-[color:var(--text-secondary)] truncate" title={d.reference}>{d.reference}</span>
                 </div>
-                {(isFailed || isPending) && isMarasoft && (
+                {isPending && isMarasoft && (
                   <button
                     onClick={() => recheck(d.reference)}
                     disabled={isBusy}
                     data-testid={`dep-recheck-${d.id}`}
                     className="mt-3 w-full inline-flex items-center justify-center gap-1.5 text-xs font-semibold px-3 py-2 rounded-lg border border-[color:var(--border-default)] hover:bg-[color:var(--surface-alt)] hover:border-[color:var(--brand)] hover:text-[color:var(--brand)] transition-colors disabled:opacity-60">
                     <RefreshCw className={`w-3 h-3 ${isBusy ? "animate-spin" : ""}`} />
-                    {isBusy ? "Rechecking…" : isFailed ? "Recheck — I actually paid" : "Recheck status"}
+                    {isBusy ? "Rechecking…" : "Recheck status"}
                   </button>
                 )}
               </div>

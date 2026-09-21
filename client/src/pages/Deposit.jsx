@@ -176,7 +176,7 @@ export default function Deposit() {
               </div>
               <div className="end">
                 <span className={`pill ${d.status === "success" ? "success" : d.status === "failed" ? "danger" : "warn"}`}>{d.status}</span>
-                {d.status !== "success" && (
+                {d.status === "pending" && (
                   <button className="btn ghost sm" style={{ marginTop: 6 }} onClick={() => recheck(d.reference)}>Recheck</button>
                 )}
               </div>
