@@ -136,7 +136,7 @@ async function createCheckout({ amount, reference, name, email, phone }, cfg) {
       amount: Math.round(Number(amount)),
       currency: "NGN",
       reference,
-      feeBearer: "customer",
+      feeBearer: "merchant",
       customer: {
         name: name || "Customer",
         email: email || "customer@lumenhub.com",
