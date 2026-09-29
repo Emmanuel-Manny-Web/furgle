@@ -1500,6 +1500,10 @@ router.post("/withdrawal/request", authMiddleware, async (req, res) => {
   }
   if (req.user.wallet_balance < amt) return res.status(400).json({ detail: "Insufficient balance" });
 
+  // Require at least one active investment before a user can withdraw.
+  const activeInvestment = await db.get("SELECT 1 FROM investments WHERE user_id = ? AND status = 'active' LIMIT 1", req.user.id);
+  if (!activeInvestment) return res.status(400).json({ detail: "You need an active investment to withdraw" });
+
   const fee = amt * feePct / 100;
   const net = amt - fee;
   const id = "w_" + uuidv4().replace(/-/g, "").slice(0, 16);
