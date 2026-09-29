@@ -48,7 +48,7 @@ function getConfig(settings) {
     secretKey: s.kora_secret_key || process.env.KORA_SECRET_KEY || "",
     publicKey: s.kora_public_key || process.env.KORA_PUBLIC_KEY || "",
     encryptionKey: s.kora_encryption_key || process.env.KORA_ENCRYPTION_KEY || "",
-    proxyUrl: s.fixie_proxy_url || process.env.FIXIE_PROXY_URL || "",
+    proxyUrl: s.lumenhub_proxy_url || process.env.LUMENHUB_PROXY_URL || "",
   };
 }
 
@@ -56,7 +56,7 @@ function request(method, path, body, cfg, authKey) {
   return new Promise((resolve, reject) => {
     const url = new URL(BASE + path);
     const payload = body ? JSON.stringify(body) : null;
-    const agent = getProxyAgent(cfg && cfg.proxyUrl, { track: true });
+    const agent = getProxyAgent(cfg && cfg.proxyUrl);
     const req = https.request(
       {
         hostname: url.hostname,
