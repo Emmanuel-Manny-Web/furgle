@@ -696,7 +696,7 @@ export default function AdminSettings() {
               <p className="text-[11px] text-[color:var(--text-tertiary)] mt-3"><span className="font-bold text-[color:var(--text-primary)]">Webhook URL:</span> <code className="break-all">{(process.env.REACT_APP_BACKEND_URL || "")}/api/deposit/webhook/fossapay</code></p>
             </Section>
 
-            <Section title="Fixie outbound proxy" hint="Used only by JuntPay and Nekpay. Paste the full Fixie URL (including the http://…token@host:port part).">
+            <Section title="Fixie outbound proxy" hint="Used by JuntPay, Nekpay and Kora. Paste the full Fixie URL (including the http://…token@host:port part).">
               <SecretField
                 label="Fixie proxy URL"
                 value={s.fixie_proxy_url}
@@ -707,7 +707,7 @@ export default function AdminSettings() {
               />
             </Section>
 
-            <Section title="LumenHub outbound proxy" hint="Used by Paystack, Nomba, Duplo, Kora and FossaPay. Paste the full proxy URL (e.g. your lumenhubtech.com forward proxy).">
+            <Section title="LumenHub outbound proxy" hint="Used by Paystack, Nomba, Duplo and FossaPay. Paste the full proxy URL (e.g. your lumenhubtech.com forward proxy).">
               <SecretField
                 label="LumenHub proxy URL"
                 value={s.lumenhub_proxy_url}
