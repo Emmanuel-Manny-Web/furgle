@@ -265,7 +265,7 @@ async function createPayout({ amount, account_number, bank_code, account_name, r
     }, cfg);
     if (!r.body || !r.body.data) return { error: (r.body && (r.body.message || r.body.error)) || "Kora payout failed" };
     const d = r.body.data;
-    return { data: { reference: d.reference || reference, status: d.status || "processing" } };
+    return { data: { reference: d.reference || reference, status: d.status || "processing", message: d.message || null } };
   } catch (err) {
     return { error: err.message };
   }

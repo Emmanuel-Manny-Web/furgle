@@ -1386,6 +1386,7 @@ async function executePayout(wd, settings) {
     await db.run("UPDATE withdrawals SET bank_code = ?, gateway = 'kora', gateway_reference = ? WHERE id = ?", bankCode, data.reference || null, wd.id);
     const status = String(data.status || "").toLowerCase();
     if (["success", "paid", "completed"].includes(status)) return { ok: true, status: "success", reference: data.reference };
+    if (["failed", "reversed", "rejected", "cancelled"].includes(status)) return { ok: false, status: "rejected", reference: data.reference, error: data.message || "Kora rejected the payout" };
     return { ok: true, status: "processing", reference: data.reference };
   }
 
