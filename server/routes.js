@@ -77,7 +77,7 @@ const DEFAULT_SETTINGS = {
   transfer_description_template: "",
   welcome_message: "", welcome_modal_active: true, welcome_modal_title: "",
   whatsapp_channel_url: "", whatsapp_group_url: "",
-  withdrawal_end_time: "18:00", withdrawal_fee_percent: 15, withdrawal_start_time: "10:30", withdrawals_open: true,
+  withdrawal_end_time: "18:00", withdrawal_fee_percent: 15, withdrawal_start_time: "10:30", withdrawals_open: true, withdrawal_timezone: "Africa/Lagos",
   gateway_juntpay_enabled: false,
   juntpay_app_id: "", juntpay_merchant_id: "", juntpay_secret_key: "",
   juntpay_deposit_way_code: "", juntpay_payout_way_code: "BANK_TRANSFER", juntpay_notify_url: "",
@@ -143,12 +143,35 @@ async function creditDepositBonus(userId, amount, reference) {
 }
 
 // Check whether withdrawals are currently open (open flag + daily time window).
+// The window is evaluated in the business timezone (default Africa/Lagos) so a
+// UTC Railway host doesn't shift the configured start/end times.
 function isWithdrawalWindowOpen(settings) {
   if (!settings.withdrawals_open) return false;
   const start = settings.withdrawal_start_time || "00:00";
   const end = settings.withdrawal_end_time || "23:59";
-  const now = new Date();
-  const cur = now.getHours() * 60 + now.getMinutes();
+  const tz = settings.withdrawal_timezone || "Africa/Lagos";
+
+  let hour = 0;
+  let minute = 0;
+  try {
+    const parts = new Intl.DateTimeFormat("en-GB", {
+      timeZone: tz,
+      hour: "2-digit",
+      minute: "2-digit",
+      hourCycle: "h23",
+    }).formatToParts(new Date());
+    const h = parts.find((p) => p.type === "hour");
+    const m = parts.find((p) => p.type === "minute");
+    hour = Number(h ? h.value : 0) % 24;
+    minute = Number(m ? m.value : 0);
+  } catch {
+    // Invalid/unavailable timezone — fall back to WAT (UTC+1).
+    const now = new Date();
+    hour = (now.getUTCHours() + 1) % 24;
+    minute = now.getUTCMinutes();
+  }
+  const cur = hour * 60 + minute;
+
   const [sh, sm] = String(start).split(":").map(Number);
   const [eh, em] = String(end).split(":").map(Number);
   const startMin = (sh || 0) * 60 + (sm || 0);
