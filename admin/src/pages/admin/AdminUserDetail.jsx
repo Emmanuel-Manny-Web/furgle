@@ -476,7 +476,7 @@ function TabBody({ tab, items }) {
             </span>
           </td>
           <td className="p-3"><span className={`pill ${d.status === "success" ? "pill-success" : d.status === "failed" ? "pill-error" : "pill-warn"}`}>{d.status}</span></td>
-          <td className="p-3 font-mono text-xs text-[color:var(--text-tertiary)]">{d.reference}</td>
+          <td className="p-3 font-mono text-xs text-[color:var(--text-tertiary)]">{d.method === "nekpay" ? (d.pay_order_id || d.gateway_id || "—") : d.reference}</td>
           <td className="p-3 text-xs text-[color:var(--text-tertiary)]">{formatDate(d.created_at)}</td>
         </tr>
       ))}
