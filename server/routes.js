@@ -83,6 +83,7 @@ const DEFAULT_SETTINGS = {
   juntpay_deposit_way_code: "", juntpay_payout_way_code: "BANK_TRANSFER", juntpay_notify_url: "",
   gateway_duplo_enabled: false,
   duplo_api_key: "",
+  duplo_deposit_method: "virtual_account",
   gateway_kora_enabled: false,
   kora_secret_key: "", kora_public_key: "", kora_encryption_key: "",
   kora_deposit_method: "bank_transfer", kora_virtual_account_bank_code: "035",
@@ -624,6 +625,22 @@ router.post("/deposit/initialize", authMiddleware, async (req, res) => {
     const cfg = duplo.getConfig(settings);
     if (!cfg.apiKey) return res.status(400).json({ detail: "Duplo is not configured (missing API key)" });
 
+    const duploMethod = settings.duplo_deposit_method || "virtual_account";
+
+    if (duploMethod === "checkout") {
+      const result = await duplo.createCheckout({
+        amount: amt,
+        email: emailFromName(req.user.name),
+        name: req.user.name || "Customer",
+        sourceReference: reference,
+        redirect_url: returnUrl,
+      }, cfg);
+      if (result.error) return res.status(502).json({ detail: result.error });
+      const d = result.data;
+      await db.run("INSERT INTO deposits (id, user_id, amount, reference, method, status, gateway_id) VALUES (?, ?, ?, ?, 'duplo', 'pending', ?)", id, req.user.id, amt, reference, d.source_reference || d.checkout_reference || reference);
+      return res.status(201).json({ id, reference, amount: amt, status: "pending", mode: "live", type: "redirect", authorization_url: d.checkout_url });
+    }
+
     // A Duplo customer can only have one dedicated virtual account. Reuse the
     // account from the user's most recent Duplo deposit instead of trying to
     // create a new customer (which errors for existing customers).
@@ -800,6 +817,26 @@ router.get("/deposit/verify/:reference", async (req, res) => {
 
   if (dep.method === "duplo") {
     const cfg = duplo.getConfig(await getAllSettings());
+
+    // Hosted checkout (no dedicated account) — verify by source reference.
+    if (!dep.account_number) {
+      const v = await duplo.verifyCheckout(dep.gateway_id || dep.reference, cfg);
+      const st = v.data ? String(v.data.status || "").toLowerCase() : "";
+      if (st === "completed") {
+        if (dep.status !== "success") {
+          await db.run("UPDATE deposits SET status = 'success', updated_at = to_char(now() AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI:SS') WHERE id = ?", dep.id);
+          await addTransaction(dep.user_id, "deposit", dep.amount, "Deposit", { reference: dep.reference, gateway: "duplo" });
+          await creditDepositBonus(dep.user_id, dep.amount, dep.reference);
+        }
+        return res.json({ status: "success", reference: dep.reference, amount: dep.amount });
+      }
+      if (["failed", "cancelled", "canceled"].includes(st)) {
+        await db.run("UPDATE deposits SET status = 'failed', updated_at = to_char(now() AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI:SS') WHERE id = ?", dep.id);
+        return res.json({ status: "failed", reference: dep.reference, amount: dep.amount });
+      }
+      return res.json({ status: "pending", reference: dep.reference, amount: dep.amount });
+    }
+
     const result = await duplo.listTransactions(dep.account_number, cfg);
     if (result.error || !result.data) return res.json({ status: "pending", reference: dep.reference, amount: dep.amount });
     const expected = Math.round(dep.amount * 100); // kobo

@@ -200,6 +200,7 @@ export default function AdminSettings() {
         juntpay_payout_way_code: s.juntpay_payout_way_code || "",
         juntpay_notify_url: s.juntpay_notify_url || "",
         duplo_api_key: s.duplo_api_key || "",
+        duplo_deposit_method: s.duplo_deposit_method || "virtual_account",
         kora_secret_key: s.kora_secret_key || "",
         kora_public_key: s.kora_public_key || "",
         kora_encryption_key: s.kora_encryption_key || "",
@@ -634,6 +635,13 @@ export default function AdminSettings() {
 
             <Section title="Duplo credentials" hint="Used for Duplo (Atlas) deposits & payouts. The API key comes from your Duplo dashboard (Settings → Developer).">
               <SecretField label="API key" value={s.duplo_api_key} onChange={(v) => setS({ ...s, duplo_api_key: v })} placeholder="pk_test_..." testid="duplo-api-key" />
+              <div className="mt-3">
+                <label className="text-xs font-bold text-[color:var(--text-secondary)] uppercase tracking-wide">Deposit method</label>
+                <div className="grid grid-cols-2 gap-2 mt-2">
+                  <GatewayCard active={(s.duplo_deposit_method || "virtual_account") === "virtual_account"} label="Fixed" name="Virtual account" sub="Persistent account (bank transfer)" onClick={() => setS({ ...s, duplo_deposit_method: "virtual_account" })} testid="duplo-method-virtual-account" />
+                  <GatewayCard active={s.duplo_deposit_method === "checkout"} label="Hosted" name="Checkout" sub="Redirect to Duplo checkout" onClick={() => setS({ ...s, duplo_deposit_method: "checkout" })} testid="duplo-method-checkout" />
+                </div>
+              </div>
               <p className="text-[11px] text-[color:var(--text-tertiary)] mt-3"><span className="font-bold text-[color:var(--text-primary)]">Webhook URL:</span> <code className="break-all">{(process.env.REACT_APP_BACKEND_URL || "")}/api/deposit/webhook/duplo</code></p>
             </Section>
 
