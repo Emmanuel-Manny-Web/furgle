@@ -1168,13 +1168,17 @@ router.post("/deposit/webhook/duplo", async (req, res) => {
     // `recipient.accountNumber` (the receiving virtual account); we match on
     // the recipient, which is our virtual account.
     const accountNumber = (data.recipient && data.recipient.accountNumber) || "";
+    // Credit the ACTUAL amount received, not the requested deposit amount.
+    // Duplo's webhook reports kobo; convert to naira.
+    const rawAmount = data.amount && typeof data.amount === "object" ? data.amount.value : data.amount;
+    const amountNaira = Math.round((Number(rawAmount) || 0)) / 100;
     const dep = accountNumber
-      ? await db.get("SELECT * FROM deposits WHERE account_number = ? AND method = 'duplo'", accountNumber)
+      ? await db.get("SELECT * FROM deposits WHERE account_number = ? AND method = 'duplo' AND status = 'pending'", accountNumber)
       : null;
-    if (dep && dep.status !== "success") {
-      await db.run("UPDATE deposits SET status = 'success', updated_at = to_char(now() AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI:SS') WHERE id = ?", dep.id);
-      await addTransaction(dep.user_id, "deposit", dep.amount, "Deposit", { reference: dep.reference, gateway: "duplo" });
-      await creditDepositBonus(dep.user_id, dep.amount, dep.reference);
+    if (dep && amountNaira > 0) {
+      await db.run("UPDATE deposits SET status = 'success', amount = ?, updated_at = to_char(now() AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI:SS') WHERE id = ?", amountNaira, dep.id);
+      await addTransaction(dep.user_id, "deposit", amountNaira, "Deposit", { reference: dep.reference, gateway: "duplo" });
+      await creditDepositBonus(dep.user_id, amountNaira, dep.reference);
     }
     return res.status(200).send("OK");
   }
