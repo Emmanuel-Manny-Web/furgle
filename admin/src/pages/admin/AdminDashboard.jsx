@@ -429,7 +429,7 @@ function computeRange(id) {
 
 export default function AdminDashboard() {
   const navigate = useNavigate();
-  const { data: s } = useCachedData("/admin/stats/extended", async () => (await api.get("/admin/stats/extended")).data);
+  const { data: s, reload: reloadStats } = useCachedData("/admin/stats/extended", async () => (await api.get("/admin/stats/extended")).data);
   const [range, setRange] = useState("7d");
   const [inflow, setInflow] = useState(null);
   const [customFrm, setCustomFrm] = useState("");
@@ -438,6 +438,13 @@ export default function AdminDashboard() {
   const [drillData, setDrillData] = useState(null);
   const [drillLoading, setDrillLoading] = useState(false);
   const [drillQ, setDrillQ] = useState("");
+
+  // Keep the dashboard stats fresh — the cached stats only fetch on mount, so
+  // refresh periodically to reflect new deposits/withdrawals without a reload.
+  useEffect(() => {
+    const id = setInterval(() => { reloadStats(); }, 30000);
+    return () => clearInterval(id);
+  }, [reloadStats]);
 
   const loadInflow = useCallback(async (frm, to) => {
     const { data } = await api.get("/admin/stats/inflow", { params: { frm, to } });
