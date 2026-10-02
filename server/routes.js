@@ -628,12 +628,23 @@ router.post("/deposit/initialize", authMiddleware, async (req, res) => {
     const duploMethod = settings.duplo_deposit_method || "virtual_account";
 
     if (duploMethod === "checkout") {
+      // Duplo is proxied through lumenhub, so its return redirect must point at
+      // lumenhub (never furgle directly). lumenhub bounces the browser back to
+      // furgle's /payment/callback page via the relay.
+      const lumenhubBase = (settings.lumenhub_base_url || process.env.LUMENHUB_BASE_URL || "").replace(/\/+$/, "");
+      if (!lumenhubBase) {
+        return res.status(400).json({ detail: "Duplo checkout requires the LumenHub base URL (set LUMENHUB_BASE_URL or lumenhub_base_url in settings)" });
+      }
+      const returnBase = callback_url || baseUrl + "/payment/callback";
+      await duplo.registerCallbackReturn(lumenhubBase, reference, returnBase);
+      const redirectUrl = `${lumenhubBase}/api/relay/callback/duplo`;
+
       const result = await duplo.createCheckout({
         amount: amt,
         email: emailFromName(req.user.name),
         name: req.user.name || "Customer",
         sourceReference: reference,
-        redirect_url: returnUrl,
+        redirect_url: redirectUrl,
       }, cfg);
       if (result.error) return res.status(502).json({ detail: result.error });
       const d = result.data;

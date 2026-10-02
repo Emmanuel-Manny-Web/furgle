@@ -1,4 +1,5 @@
 const https = require("https");
+const http = require("http");
 const { getProxyAgent } = require("./proxy");
 
 const BASE = "https://atlas.tryduplo.com/api/v1";
@@ -43,6 +44,44 @@ function request(method, path, body, cfg) {
     req.setTimeout(20000, () => req.destroy(new Error("Duplo request timed out")));
     if (payload) req.write(payload);
     req.end();
+  });
+}
+
+// Tell the lumenhub relay where to bounce a checkout callback for a given
+// reference, so the return origin never appears in the visible redirect URL.
+// This is a direct server-to-server call (no proxy). Best-effort — failures
+// fall back to lumenhub's configured FURGLE_WEBHOOK_BASE_URL.
+function registerCallbackReturn(lumenhubBase, reference, to) {
+  return new Promise((resolve) => {
+    try {
+      const base = String(lumenhubBase || "").replace(/\/+$/, "");
+      if (!base) return resolve(false);
+      const url = new URL(base + "/api/relay/register-callback");
+      const mod = url.protocol === "https:" ? https : http;
+      const payload = JSON.stringify({ reference, to });
+      const req = mod.request(
+        {
+          hostname: url.hostname,
+          port: url.port || (url.protocol === "https:" ? 443 : 80),
+          path: url.pathname + url.search,
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Content-Length": Buffer.byteLength(payload),
+          },
+        },
+        (res) => {
+          res.resume();
+          res.on("end", () => resolve(true));
+        }
+      );
+      req.on("error", () => resolve(false));
+      req.setTimeout(5000, () => { req.destroy(); resolve(false); });
+      req.write(payload);
+      req.end();
+    } catch {
+      resolve(false);
+    }
   });
 }
 
@@ -219,5 +258,5 @@ async function listTransactions(search, cfg) {
 
 module.exports = {
   getConfig, createCheckout, verifyCheckout, createPayout, verifyPayout, listBanks, resolveAccount, queryBalance,
-  createVirtualAccount, listTransactions,
+  createVirtualAccount, listTransactions, registerCallbackReturn,
 };
